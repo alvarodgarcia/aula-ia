@@ -2,7 +2,7 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión de referencia: 1.0.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.1.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
 
 ![Acceso a Aula IA](docs/screenshots/acceso.png)
 
@@ -15,6 +15,7 @@ Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso
 - Notas de lo aprendido en clase y repasos por materia y fechas, para preparar exámenes.
 - Subida de varias fotos o PDF en ESO y Bachillerato, desde cámara o archivos, con revisión del texto extraído.
 - Manual interactivo en `/ayuda` y PDF descargable en `/ayuda/pdf`.
+- Información familiar de privacidad, cookies y uso de IA en `/privacidad`, con avisos junto al micrófono y los archivos.
 
 El tutor actúa como apoyo: explica dudas, enseña métodos y propone práctica. Las peticiones para sustituir tareas o lecturas se redirigen pedagógicamente y quedan registradas. La revisión con IA no garantiza que todos los intentos de eludir esas reglas se detecten.
 

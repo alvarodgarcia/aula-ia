@@ -1348,6 +1348,19 @@ def student_help_pdf() -> FileResponse:
     return FileResponse(ROOT / "guide" / "manual.pdf", media_type="application/pdf",
                         filename="Manual_alumno_Aula_IA.pdf", headers={"Cache-Control": "no-cache"})
 
+@app.get("/privacidad", response_class=HTMLResponse, include_in_schema=False)
+def privacy_page(request: Request) -> HTMLResponse:
+    # A public information page does not need to create a session for an anonymous visitor.
+    signed_in = request.session.get("authenticated") or request.session.get("student_id")
+    return templates.TemplateResponse(
+        request=request, name="privacy.html",
+        context={"request": request, "app_name": os.getenv("APP_NAME", "Aula IA"),
+                 "title": "Privacidad y uso de IA · Aula IA", "notice": "",
+                 "csrf_token": csrf_value(request) if signed_in else ""},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request) -> HTMLResponse:
     if authenticated(request):

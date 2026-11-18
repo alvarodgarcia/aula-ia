@@ -19,6 +19,7 @@
     </summary>
 
     <div class="tutor-content">
+      <p class="privacy-note tutor-disclosure">{{ "Soy un ayudante de inteligencia artificial. A veces me equivoco. Si dudas, pregunta a tu adulto." if age_group == "early" else "Soy un tutor de inteligencia artificial. Puedo equivocarme: contrasta las respuestas cuando tengas dudas." }} <a href="/privacidad#para-alumnos">Sobre tu tutor</a>.</p>
       {% if in_exercise %}
       <div class="tutor-actions">
         <div data-tutor-voice-control hidden>
@@ -47,8 +48,9 @@
       {% if tutor_notice %}<p class="notice notice-error" role="status">{{ tutor_notice }}</p>{% endif %}
       {% if tutor_conversation_available() %}
       <section class="stack tutor-conversation" data-tutor-conversation{% if in_exercise %} data-exercise-id="{{ exercise.id }}"{% endif %} hidden>
+        <p class="privacy-note" id="tutor-voice-privacy">Al activar la conversación, tus turnos de voz se envían a OpenAI para convertirlos en texto y responderte. El adulto puede revisar las solicitudes y respuestas registradas. <a href="/privacidad#voz">Sobre el micrófono</a>.</p>
         <div class="tutor-question-actions">
-          <button type="button" class="button button-primary" data-conversation-toggle>Conversar por voz</button>
+          <button type="button" class="button button-primary" data-conversation-toggle aria-describedby="tutor-voice-privacy">Conversar por voz</button>
         </div>
         <p data-conversation-status role="status"></p>
         <div class="tutor-reply" data-conversation-result hidden>

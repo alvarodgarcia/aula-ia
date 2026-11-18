@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="privacy-page">
+  <header class="hero admin-hero">
+    <div><span class="eyebrow">Un espacio privado para tu familia</span><h1>Privacidad y uso de IA</h1><p>Qué guardamos, cómo te ayuda el tutor y qué puedes decidir con tu adulto.</p></div>
+  </header>
+  <nav class="privacy-index" aria-label="Contenido de privacidad">
+    <a href="#para-alumnos">Para alumnos</a><a href="#datos">Datos y supervisión</a><a href="#archivos">Fotos y PDF</a><a href="#voz">Voz e IA</a><a href="#conservacion">Conservación</a><a href="#cookies">Cookies</a>
+  </nav>
+  <section class="card privacy-section" id="para-alumnos">
+    <span class="eyebrow">Para ti</span><h2>Pregunta, aprende y cuida lo que compartes</h2>
+    <ul>
+      <li>Tu tutor es una inteligencia artificial, aunque tenga nombre, personaje y voz. Puede equivocarse.</li>
+      <li>Comparte tus dudas y material de clase. Evita contraseñas, direcciones, datos de salud, caras y datos de otras personas.</li>
+      <li>El adulto que administra Aula IA puede revisar tus apuntes, archivos y las solicitudes y respuestas registradas. Esta conversación no es un chat confidencial frente a ese adulto.</li>
+      <li>Si algo te incomoda, parece incorrecto o quieres retirar información, habla con tu adulto. Puedes pedir ayuda escribiendo sin activar el micrófono.</li>
+    </ul>
+  </section>
+  <div class="privacy-grid">
+    <section class="card privacy-section" id="datos">
+      <h2>Datos y supervisión familiar</h2>
+      <p>Esta instalación está destinada exclusivamente al uso privado de una familia. El adulto administrador gestiona los accesos y los materiales; no hay registro público de alumnos.</p>
+      <p>Se guardan el nombre o alias del perfil, la edad y el curso, los ejercicios, intentos y resultados, las notas y adjuntos, la elección del tutor y los registros de solicitudes y supervisión. El PIN se guarda mediante una función de derivación, no como texto legible.</p>
+      <p>Los datos sirven para adaptar la ayuda, retomar lo estudiado y permitir la supervisión y los límites del adulto. La aplicación no incorpora publicidad ni herramientas de analítica de terceros. El servidor y los sistemas de seguridad pueden generar registros técnicos de acceso.</p>
+      <p>El acceso a la web y a sus datos debe mantenerse restringido a la familia. Si se amplía a otras familias, una academia o un centro, se deberá revisar el marco de protección de datos y actualizar esta información.</p>
+    </section>
+    <section class="card privacy-section" id="archivos">
+      <h2>Fotos, PDF y apuntes</h2>
+      <p>Los originales se guardan en el servidor familiar. La lectura del texto de fotos y PDF (OCR) se realiza en el servidor de Aula IA. El adulto puede revisar el material subido por el alumno.</p>
+      <p>Cuando se utiliza ese material con el tutor o para generar actividades, el texto o los fragmentos seleccionados pueden enviarse al proveedor de IA configurado. Guardar un archivo y realizar su OCR no envía por sí solo ese original a OpenAI.</p>
+      <p>Fotografía solo la parte necesaria del material. Recorta nombres, caras u otros datos ajenos antes de subirlo. Revisa el texto extraído: el OCR puede cometer errores.</p>
+    </section>
+    <section class="card privacy-section" id="voz">
+      <h2>Micrófono, texto y proveedor de IA</h2>
+      <p>La conversación por micrófono se inicia al pulsar su botón y autorizar el acceso en el dispositivo. Mientras esté activa, detecta las pausas y envía los turnos grabados a OpenAI para transcribirlos. «Finalizar conversación» detiene esa conversación y libera el micrófono.</p>
+      <p>Dictar una nota o adjuntar una grabación también envía el audio a OpenAI. La aplicación no conserva esas grabaciones de entrada como archivos permanentes; sí puede conservar el texto, las respuestas y los registros asociados. Para las notas dictadas, el texto se guarda como apunte cuando pulsas Guardar nota.</p>
+      <p>Las consultas escritas y el contexto necesario se envían al proveedor configurado: OpenAI o un servidor compatible, como Ollama. La síntesis de voz de OpenAI recibe el texto que se va a leer. Algunas lecturas pueden utilizar las voces del dispositivo, según el navegador.</p>
+      <p>El permiso del navegador permite utilizar el micrófono o la cámara; no sustituye la información sobre el tratamiento de los datos. El adulto debe revisar las condiciones y configuración del proveedor, incluidas las relativas a menores, conservación y ubicación de los datos. Esta página no garantiza que el proveedor elimine inmediatamente los datos ni que su configuración sea idéntica en todas las instalaciones.</p>
+    </section>
+    <section class="card privacy-section" id="conservacion">
+      <h2>Conservación y retirada</h2>
+      <p>Los apuntes, adjuntos, ejercicios, intentos y registros de supervisión no tienen un borrado automático general. Permanecen en el servidor hasta que el adulto los elimine o gestione su retirada. Las copias de seguridad tienen su propia conservación y no se modifican automáticamente al borrar un registro.</p>
+      <p><strong>Retirar un apunte como alumno no lo borra:</strong> conserva una copia para la supervisión del adulto. El adulto puede eliminar el material desde supervisión. Para otras eliminaciones, correcciones o una limpieza completa del perfil y sus copias, habla con el adulto que administra el servidor; no hay un botón de borrado completo del perfil.</p>
+      <p>Se mantienen algunas conversaciones recientes como contexto. También se guardan registros para supervisión y límites de uso y se reutilizan clips de voz generados para evitar llamadas repetidas. El adulto debe revisar periódicamente qué información y copias sigue necesitando.</p>
+    </section>
+  </div>
+  <section class="card privacy-section" id="cookies">
+    <span class="eyebrow">Información técnica</span><h2>Cookies de esta aplicación</h2>
+    <p>Aula IA utiliza una cookie propia llamada <strong>session</strong> para mantener el acceso, proteger formularios y conservar el estado necesario de la sesión. No se utiliza para publicidad ni seguimiento entre webs.</p>
+    <dl class="cookie-facts"><div><dt>Finalidad</dt><dd>Autenticación, seguridad y funcionamiento de la sesión.</dd></div><div><dt>Duración configurada</dt><dd>12 horas, renovables al utilizar la aplicación.</dd></div><div><dt>Control</dt><dd>Puedes cerrar sesión o eliminarla desde tu navegador. Sin ella no funcionan el acceso y los formularios protegidos.</dd></div></dl>
+    <p>Además, el navegador guarda localmente la elección del personaje y la preferencia de reducir su animación (<strong>localStorage</strong>). Se utilizan para recordar tus ajustes, no para publicidad. Pueden permanecer en ese dispositivo después de cerrar sesión, hasta que borres los datos del sitio en el navegador; la elección del personaje también se guarda en el perfil del servidor.</p>
+    <p>Esta versión no instala cookies de analítica o publicidad ni añade un panel para aceptarlas. Las cookies estrictamente necesarias tienen un tratamiento específico en la normativa. El adulto debe comprobar también las cookies o tecnologías que añadan el alojamiento y los sistemas de seguridad: esta página describe la aplicación, no certifica la configuración externa.</p>
+  </section>
+  <section class="privacy-section privacy-sources">
+    <h2>Información para el adulto</h2>
+    <p>Este texto describe el funcionamiento de una instalación familiar; no es una certificación jurídica. La excepción doméstica depende del uso real y no ampara la apertura de datos a un grupo indeterminado de personas.</p>
+    <p>Referencias: <a href="https://www.aepd.es/preguntas-frecuentes/0-conceptos-basicos/FAQ-0012-sobre-datos-personales-tratados-por-un-particular-en-actividades-privadas" rel="noreferrer">AEPD: actividades personales o domésticas</a> · <a href="https://www.aepd.es/guias/guia-cookies.pdf" rel="noreferrer">AEPD: guía sobre cookies</a>.</p>
+    <p>Actualizado el 18 de noviembre de 2026 · Aula IA 1.1.0</p>
+    <a class="button button-secondary" href="/">Volver a Aula IA</a>
+  </section>
+</article>
+{% endblock %}

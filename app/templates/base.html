@@ -6,7 +6,7 @@
   <title>{{ title or app_name }}</title>
   <link rel="stylesheet" href="/static/app.css">
   {% block page_styles %}{% endblock %}
-  <link rel="stylesheet" href="/static/app-design.css?v=1">
+  <link rel="stylesheet" href="/static/app-design.css?v=2">
   <script defer src="/static/app.js?v=3"></script>
 </head>
 <body{% block body_attributes %}{% endblock %}>
@@ -21,6 +21,9 @@
     {% if notice %}<div class="notice" role="status">{{ notice }}</div>{% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="footer"><a href="/ayuda">Cómo usar Aula IA</a> · Aula IA · Entorno familiar privado</footer>
+  <footer class="footer">
+    <nav aria-label="Ayuda y privacidad"><a href="/ayuda">Cómo usar Aula IA</a><a href="/privacidad">Privacidad y uso de IA</a><a href="/privacidad#cookies">Cookies</a></nav>
+    <span>Aula IA · Entorno familiar privado</span>
+  </footer>
 </body>
 </html>

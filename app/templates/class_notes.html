@@ -49,12 +49,12 @@
     </label>
     {% if transcription_available %}
     <div class="note-dictation" data-class-dictation hidden>
+      <p class="privacy-note" id="note-audio-privacy">Al dictar o adjuntar una grabación, el audio se envía a OpenAI para convertirlo en texto. Evita nombres completos y datos de otras personas. Revisa el texto antes de guardar. <a href="/privacidad#voz">Privacidad de la voz</a>.</p>
       <div class="study-actions">
-        <button type="button" class="button button-secondary" data-record-note hidden>Dictar nota</button>
-        <button type="button" class="button button-secondary" data-upload-note>Adjuntar grabación</button>
-        <input type="file" accept="audio/*,.webm,.mp4,.m4a,.wav,.ogg,.mp3,.flac,.mpeg" data-note-audio hidden>
+        <button type="button" class="button button-secondary" data-record-note aria-describedby="note-audio-privacy" hidden>Dictar nota</button>
+        <button type="button" class="button button-secondary" data-upload-note aria-describedby="note-audio-privacy">Adjuntar grabación</button>
+        <input type="file" accept="audio/*,.webm,.mp4,.m4a,.wav,.ogg,.mp3,.flac,.mpeg" data-note-audio aria-describedby="note-audio-privacy" hidden>
       </div>
-      <small>OpenAI convierte el audio en texto. Revisa la nota antes de guardarla.</small>
       <p data-dictation-status role="status"></p>
     </div>
     {% endif %}

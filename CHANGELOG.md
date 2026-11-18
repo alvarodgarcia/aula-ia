@@ -1,5 +1,11 @@
 # Cambios de Aula IA
 
+## 1.2.1 · 2026-11-18
+
+- Separación completa de OpenAI y Azure en el panel de consumo y en el resumen del adulto: llamadas, cachés, detalle por alumno e históricos propios.
+- El coste estimado de texto se muestra únicamente junto al proveedor que lo generó. Azure conserva sus caracteres, reservas y límite independiente.
+- Se conservan los registros y presupuestos existentes. Los datos de otros proveedores, si existen, mantienen su sección propia.
+
 ## 1.2.0 · 2026-11-18
 
 - Panel de adulto «Consumo y límites de IA», con filtros de periodo y alumno, totales y detalle de llamadas.

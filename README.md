@@ -2,7 +2,7 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión actual: 1.2.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.2.1.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
 
 ![Acceso a Aula IA](docs/screenshots/acceso.png)
 
@@ -27,7 +27,7 @@ El tutor actúa como apoyo: explica dudas, enseña métodos y propone práctica.
 - Revisión, bloqueo y eliminación de apuntes del alumnado.
 - Auditoría de solicitudes y límite diario de IA por alumno, incluida su pausa.
 - Historial, seguimiento y estimación de consumo del proveedor.
-- [Consumo total y por alumno](docs/CONSUMO_Y_LIMITES.md), con avisos y bloqueo configurable de presupuestos de texto.
+- [Consumo total y por alumno](docs/CONSUMO_Y_LIMITES.md), con secciones independientes de OpenAI y Azure, avisos y bloqueo configurable de presupuestos de texto.
 
 ![Panel de adulto con datos ficticios](docs/screenshots/panel-adulto.png)
 

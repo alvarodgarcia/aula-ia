@@ -182,47 +182,56 @@ def report(period, profile_filter=0, profile_ids=()):
         legacy = [] if profile_filter else _unassigned_legacy(db, since)
         policies = {p.scope_id: {"limit": p.monthly_tokens, "block": p.block} for p in db.scalars(select(Budget))}
         rows = {}
-        def row(key):
-            return rows.setdefault(key, {"profile_id": key, "calls": 0, "input": 0, "output": 0, "text_tokens": 0,
+        provider_rows = {"openai": {}, "azure": {}}
+        def row(key, store):
+            return store.setdefault(key, {"profile_id": key, "calls": 0, "input": 0, "output": 0, "text_tokens": 0,
                 "unknown": 0, "azure_chars": 0, "azure_units": 0, "seconds": 0.0, "audio_unknown": 0,
                 "cache": 0, "cached_tokens": 0, "errors": 0, "reserved": 0, "text_cost": 0.0, "cost_unknown": 0, "adult_calls": 0})
         for e in events:
-            r = row(e.profile_id)
-            if e.kind == "voice_cache":
-                r["cache"] += 1
-                continue
-            r["calls"] += 1
-            r["adult_calls"] += int(e.actor == "adult")
-            r["errors"] += int(e.status == "error")
-            r["input"] += e.input_tokens or 0
-            r["output"] += e.output_tokens or 0
-            r["cached_tokens"] += e.cached_tokens or 0
-            r["reserved"] += e.reserved_tokens
-            if e.kind == "text":
-                r["text_tokens"] += (e.input_tokens or 0) + (e.output_tokens or 0)
-                r["text_cost"] += e.cost_usd or 0
-                r["cost_unknown"] += int(e.cost_usd is None)
-            if (e.input_tokens is None or e.output_tokens is None) and e.provider != "azure":
-                r["unknown"] += 1
-            if e.kind == "azure_voice":
-                r["azure_chars"] += e.text_characters
-                r["azure_units"] += e.azure_units
-            if e.kind == "transcription":
-                if e.audio_seconds is None:
-                    r["audio_unknown"] += 1
-                else:
-                    r["seconds"] += e.audio_seconds
+            for r in (row(e.profile_id, rows), row(e.profile_id, provider_rows.setdefault(e.provider, {}))):
+                if e.kind == "voice_cache":
+                    r["cache"] += 1
+                    continue
+                r["calls"] += 1
+                r["adult_calls"] += int(e.actor == "adult")
+                r["errors"] += int(e.status == "error")
+                r["input"] += e.input_tokens or 0
+                r["output"] += e.output_tokens or 0
+                r["cached_tokens"] += e.cached_tokens or 0
+                r["reserved"] += e.reserved_tokens
+                if e.kind == "text":
+                    r["text_tokens"] += (e.input_tokens or 0) + (e.output_tokens or 0)
+                    r["text_cost"] += e.cost_usd or 0
+                    r["cost_unknown"] += int(e.cost_usd is None)
+                if (e.input_tokens is None or e.output_tokens is None) and e.provider != "azure":
+                    r["unknown"] += 1
+                if e.kind == "azure_voice":
+                    r["azure_chars"] += e.text_characters
+                    r["azure_units"] += e.azure_units
+                if e.kind == "transcription":
+                    if e.audio_seconds is None:
+                        r["audio_unknown"] += 1
+                    else:
+                        r["seconds"] += e.audio_seconds
         for e in legacy:
-            r = row(None)
-            r["calls"] += 1
-            r["input"] += e.input_tokens
-            r["output"] += e.output_tokens
-            r["text_tokens"] += e.input_tokens + e.output_tokens
-            r["text_cost"] += e.cost_usd
-        totals = {k: sum(r[k] for r in rows.values()) for k in ("calls", "input", "output", "text_tokens", "unknown", "azure_chars", "seconds", "audio_unknown", "cache", "cached_tokens", "errors", "reserved", "text_cost", "cost_unknown")}
+            for r in (row(None, rows), row(None, provider_rows.setdefault(e.provider, {}))):
+                r["calls"] += 1
+                r["input"] += e.input_tokens
+                r["output"] += e.output_tokens
+                r["text_tokens"] += e.input_tokens + e.output_tokens
+                r["text_cost"] += e.cost_usd
+        def totalize(group):
+            return {k: sum(r[k] for r in group.values()) for k in (
+                "calls", "input", "output", "text_tokens", "unknown", "azure_chars", "seconds", "audio_unknown",
+                "cache", "cached_tokens", "errors", "reserved", "text_cost", "cost_unknown")}
+        totals = totalize(rows)
+        providers = {name: {"totals": totalize(group), "rows": group,
+                           "recent": [e for e in events if e.provider == name][:25],
+                           "legacy_count": sum(e.provider == name for e in legacy)}
+                     for name, group in provider_rows.items()}
         scopes = set(rows) - {None}
         scopes |= set(policies) - {0}
         scopes |= set(profile_ids)
         monthly = {key: spent(db, key or None) for key in {0, *scopes}}
-        return {"totals": totals, "rows": list(rows.values()), "policies": policies, "monthly": monthly,
+        return {"totals": totals, "providers": providers, "rows": list(rows.values()), "policies": policies, "monthly": monthly,
                 "legacy_count": len(legacy), "recent": events[:25], "period": period, "profile_filter": profile_filter}

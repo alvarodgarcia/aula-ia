@@ -2348,7 +2348,6 @@ def consumption_page(request: Request, periodo: str = "mes", perfil: int = 0) ->
         if perfil and not any(p.id == perfil for p in profiles):
             raise HTTPException(status_code=404, detail="Perfil no encontrado")
         data = accounting.report(periodo, perfil, [p.id for p in profiles])
-        by_id = {row["profile_id"]: row for row in data["rows"]}
         today = datetime.now(learning.SCHOOL_TZ).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
         daily = dict(db.execute(select(StudentAudit.profile_id, func.count()).where(
             StudentAudit.created_at >= today, StudentAudit.uses_quota.is_(True)).group_by(StudentAudit.profile_id)).all())
@@ -2361,7 +2360,7 @@ def consumption_page(request: Request, periodo: str = "mes", perfil: int = 0) ->
         azure_counter = db.get(SecurityThrottle, key)
         azure_reserved = azure_counter.requests if azure_counter else 0
         return render(request, "consumption.html", {
-            "profiles": profiles, "report": data, "by_id": by_id, "daily": daily, "daily_limits": limits,
+            "profiles": profiles, "report": data, "daily": daily, "daily_limits": limits,
             "default_daily_limit": DEFAULT_DAILY_TUTOR_LIMIT, "azure_reserved": azure_reserved,
             "notice": get_notice(request),
         })

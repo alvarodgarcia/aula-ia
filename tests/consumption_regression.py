@@ -37,6 +37,59 @@ class ConsumptionTests(unittest.TestCase):
             self.assertTrue(all(r.cached_tokens==20 for r in rows))
         self.assertEqual(accounting.context.get(),(None,'unknown'))
         self.assertIn('max_completion_tokens',json.loads(self.calls[0].content))
+    def test_services_keep_separate_totals_history_and_profile_filters(self):
+        with self.mock(self.provider):self.ask()
+        token=accounting.context.set((self.pid,'student'))
+        try:
+            event=accounting.begin('azure_voice','azure','es-ES-ElviraNeural','sintetizar',text_characters=17,azure_units=100)
+            accounting.finish(event,audio_seconds=2)
+            accounting.cache_hit('azure','es-ES-ElviraNeural')
+            event=accounting.begin('azure_voice','azure','es-ES-ElviraNeural','sintetizar')
+            accounting.fail(event)
+        finally:accounting.context.reset(token)
+        with main.db_session() as db:
+            db.add_all([main.AIUsage(provider='openai',model='old',task='old',input_tokens=70,output_tokens=30,cost_usd=0.01,elapsed_ms=10),
+                        main.AIUsage(provider='ollama',model='local',task='old',input_tokens=800,output_tokens=100,cost_usd=0,elapsed_ms=10)])
+            db.commit()
+        data=accounting.report('mes');services=data['providers']
+        self.assertEqual(services['openai']['totals']['text_tokens'],360)
+        self.assertEqual(services['openai']['totals']['calls'],3)
+        self.assertEqual(services['openai']['totals']['cache'],0)
+        self.assertEqual(services['openai']['totals']['azure_chars'],0)
+        self.assertEqual(services['azure']['totals']['calls'],2)
+        self.assertEqual(services['azure']['totals']['errors'],1)
+        self.assertEqual(services['azure']['totals']['cache'],1)
+        self.assertEqual(services['azure']['totals']['azure_chars'],17)
+        self.assertEqual(services['azure']['totals']['text_tokens'],0)
+        self.assertEqual(services['azure']['totals']['text_cost'],0)
+        self.assertEqual(services['ollama']['totals']['text_tokens'],900)
+        self.assertEqual(services['openai']['legacy_count'],1)
+        for name,service in services.items():self.assertTrue(all(e.provider==name for e in service['recent']))
+        pupil=accounting.report('mes',self.pid)['providers']
+        self.assertEqual(pupil['openai']['totals']['text_tokens'],260)
+        self.assertNotIn('ollama',pupil)
+        self.assertEqual(pupil['azure']['rows'][self.pid]['azure_chars'],17)
+        page=self.admin.get('/consumo').text
+        azure=page.split('id="consumo-azure"',1)[1].split('id="limites-texto"',1)[0]
+        self.assertNotIn('Coste estimado de texto',azure)
+        self.assertNotIn('Tokens comunicados',azure)
+        self.assertIn('Últimas llamadas · Azure',azure)
+        self.assertIn('Últimas llamadas · OpenAI',page)
+        self.assertIn('id="consumo-ollama"',page)
+        dashboard=self.admin.get('/').text
+        self.assertIn('data-usage-provider="openai"',dashboard)
+        self.assertIn('data-usage-provider="azure"',dashboard)
+        if os.getenv('AULA_PREVIEW_DIR'):
+            Path(os.environ['AULA_PREVIEW_DIR'],'consumo-separado.html').write_text(page,encoding='utf-8')
+    def test_recent_history_is_limited_per_provider(self):
+        with self.mock(self.provider):self.ask()
+        with main.db_session() as db:
+            db.add_all([accounting.Consumption(profile_id=self.pid,actor='student',provider='azure',model='voice',kind='azure_voice',task='sintetizar',status='ok',text_characters=10) for _ in range(30)])
+            db.commit()
+        services=accounting.report('mes')['providers']
+        self.assertEqual(len(services['azure']['recent']),25)
+        self.assertEqual(len(services['openai']['recent']),2)
+        self.assertEqual(services['azure']['totals']['calls'],30)
     def test_global_and_per_student_blocks_happen_before_network(self):
         self.assertEqual(self.budget(1).status_code,303)
         with self.mock(self.provider):self.assertEqual(self.ask().status_code,303)

@@ -1,10 +1,22 @@
-# Consumo y límites de IA · Aula IA 1.2.0
+# Consumo y límites de IA · Aula IA 1.2.1
 
 El adulto accede desde **Panel de adulto → Consumo y límites de IA** (`/consumo`). El alumno no tiene acceso a los datos de consumo de otros perfiles ni puede modificar presupuestos.
 
 ![Panel con datos ficticios](screenshots/consumo-adulto.png)
 
 <img src="screenshots/consumo-movil.png" alt="Panel de consumo en móvil con datos ficticios" width="320">
+
+![Sección independiente de Azure con datos ficticios](screenshots/consumo-azure.png)
+
+## Proveedores separados
+
+**OpenAI** tiene su propia sección con llamadas, tokens, coste estimado de texto, transcripciones, alumnos e histórico. Si se usa síntesis OpenAI, sus tokens comunicados se incluyen aquí. El coste de texto no estima voz ni transcripción.
+
+**Azure Speech** tiene otra sección con llamadas de síntesis, caracteres de texto, errores, lecturas reutilizadas, alumnos e histórico. Su reserva mensual y su límite aparecen exclusivamente en esta sección. No se le atribuyen los tokens ni el coste del tutor OpenAI.
+
+El resumen del panel de adulto también muestra cada proveedor por separado. Las cachés se atribuyen al proveedor que generó la voz. Cada histórico conserva hasta 25 llamadas propias, por lo que una ráfaga de Azure no oculta las últimas llamadas de OpenAI. Si hay datos de otros proveedores, como Ollama, se presentan en otra sección propia.
+
+Los filtros de fecha y alumno afectan a todas las secciones. Los presupuestos de texto y la reserva global de Azure mantienen su ámbito mensual; la cuota diaria pedagógica se presenta aparte. La separación se aplica también a los registros anteriores que ya tenían proveedor, sin modificar sus datos.
 
 ## Qué muestra
 
@@ -40,16 +52,16 @@ Referencias: [contadores y límites de tokens de OpenAI](https://developers.open
 
 ## Instalar
 
-El parche es acumulativo y conserva las credenciales y la región de Azure de `.env`. Subir `Aula_IA_parche_v1.2.0.tar.gz` a `/tmp` y ejecutar:
+El parche es acumulativo y conserva las credenciales y la región de Azure de `.env`. Subir `Aula_IA_parche_v1.2.1.tar.gz` a `/tmp` y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.2.0-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.2.1-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.2.0.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.2.1.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web

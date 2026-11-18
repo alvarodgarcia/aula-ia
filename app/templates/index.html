@@ -144,7 +144,8 @@
 </section>
 <section class="card section-block usage-details">
   <div class="section-heading"><h2>Consumo de IA este mes</h2><a href="/consumo">Ver por alumno y configurar límites →</a></div>
-  <p>{{ consumption_summary.totals.calls }} llamadas registradas · {{ consumption_summary.totals.input + consumption_summary.totals.output }} tokens comunicados · {{ consumption_summary.totals.cache }} lecturas reutilizadas.</p>
+  <div class="two-column">{% for name, service in consumption_summary.providers.items() %}<div class="usage-provider-summary" data-usage-provider="{{ name }}"><h3>{{ 'Azure Speech' if name == 'azure' else 'OpenAI' if name == 'openai' else name }}</h3>
+  <p>{{ service.totals.calls }} llamadas · {% if name == 'azure' %}{{ service.totals.azure_chars }} caracteres de texto{% else %}{{ service.totals.input + service.totals.output }} tokens comunicados{% endif %} · {{ service.totals.cache }} lecturas reutilizadas.</p></div>{% endfor %}</div>
   {% set budget = consumption_summary.policies.get(0) %}
   {% if budget and budget.limit and consumption_summary.monthly[0] >= budget.limit * 0.8 %}<p class="notice" role="status">El consumo de texto o sus reservas se acercan al presupuesto mensual de la familia. {% if budget.block %}El bloqueo está activado.{% else %}Solo se muestran avisos.{% endif %} <a href="/consumo">Revisar consumo</a>.</p>{% endif %}
   <p class="source-ref">La voz Azure se mide en caracteres y reservas locales. El detalle distingue datos medidos, estimaciones e histórico sin alumno.</p>

@@ -16,6 +16,7 @@ Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso
 - Subida de varias fotos o PDF en ESO y Bachillerato, desde cámara o archivos, con revisión del texto extraído.
 - Manual interactivo en `/ayuda` y PDF descargable en `/ayuda/pdf`.
 - Información familiar de privacidad, cookies y uso de IA en `/privacidad`, con avisos junto al micrófono y los archivos.
+- Prueba opcional de voces Azure es-ES: [configuración y guía del recurso gratuito F0](docs/PRUEBA_AZURE_VOZ.md).
 
 El tutor actúa como apoyo: explica dudas, enseña métodos y propone práctica. Las peticiones para sustituir tareas o lecturas se redirigen pedagógicamente y quedan registradas. La revisión con IA no garantiza que todos los intentos de eludir esas reglas se detecten.
 

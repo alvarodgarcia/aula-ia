@@ -1,5 +1,13 @@
 # Cambios de Aula IA
 
+## Prueba de voz Azure sobre 1.1.0 · 2026-11-18
+
+- Proveedor de síntesis Azure Speech opcional con voces regionales es-ES: Elvira (Lumo), Ximena (Nora) y Álvaro (Samir). OpenAI conserva las respuestas y transcripciones.
+- Prueba de los tres personajes desde el panel del adulto y visualización del origen de la voz durante la reproducción.
+- Respaldo del navegador limitado a voces de España; si no hay ninguna instalada, se indica en pantalla en lugar de utilizar otra variante.
+- Cachés separadas por proveedor, región, personaje y estilo. Límite mensual global conservador para la prueba y frecuencia local de generación.
+- Asistente de configuración con clave oculta y copia privada de .env; información de privacidad actualizada para Azure.
+
 ## Revisión de 1.1.0 · Voz y conversación · 2026-11-18
 
 Mantenimiento solicitado sin crear otra versión ni sustituir etiquetas o entregas publicadas.

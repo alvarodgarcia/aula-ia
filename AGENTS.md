@@ -4,6 +4,8 @@ El usuario solicita que, a partir de la versión de referencia 1.0.0, cada mejor
 
 Excepción expresamente solicitada: la revisión de acento, naturalidad de voces y avisos de ruido/silencio es mantenimiento de 1.1.0, sin crear otra versión. Entregarla como parche de revisión; conservar las etiquetas y entregas ya publicadas.
 
+El usuario autorizó probar Azure Speech F0 para corregir el acento usando voces regionales es-ES. Mantener OpenAI para tutor y transcripción; las claves se configuran en el servidor, nunca en el chat ni en el repositorio. Esta prueba continúa la revisión de voz de 1.1.0.
+
 - Trabajar las mejoras en ramas `codex/<tema>` a partir del estado vigente; `main` es estable y `develop` prepara la siguiente entrega.
 - Actualizar `VERSION` y `CHANGELOG.md` en cada nueva entrega. Usar versiones X.Y.Z: parche para correcciones, menor para funciones compatibles y mayor para cambios incompatibles.
 - Incluir pruebas pertinentes y describir las comprobaciones realmente realizadas y sus límites. No afirmar que una revisión local certifica el servidor publicado.

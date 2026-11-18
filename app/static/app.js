@@ -98,4 +98,40 @@ function connectMaterialChoices(group) {
 document.addEventListener("DOMContentLoaded", () => {
   connectCourseSelectors("profile");
   document.querySelectorAll("[data-material-choices]").forEach(connectMaterialChoices);
+  document.querySelectorAll("[data-voice-preview]").forEach(form => {
+    const audio = form.querySelector("[data-voice-preview-audio]");
+    const status = form.querySelector("[data-voice-preview-status]");
+    let url;
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const character = event.submitter?.value;
+      if (!character) return;
+      const buttons = [...form.querySelectorAll("button")];
+      buttons.forEach(button => { button.disabled = true; });
+      audio.pause();
+      status.textContent = "Preparando la muestra de voz…";
+      try {
+        const body = new FormData(form);
+        body.set("character", character);
+        const response = await fetch(form.action, { method: "POST", body });
+        if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "No se pudo generar la muestra. Revisa la configuración de voz.");
+        }
+        const clip = await response.blob();
+        if (url) URL.revokeObjectURL(url);
+        url = URL.createObjectURL(clip);
+        audio.src = url;
+        audio.hidden = false;
+        const label = response.headers.get("X-Aula-Voice-Provider") === "azure" ? "Azure Speech · España" : "OpenAI";
+        status.textContent = `Muestra de ${character[0].toUpperCase() + character.slice(1)} · ${label}.`;
+        await audio.play().catch(() => { status.textContent += " Pulsa reproducir para escucharla."; });
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        buttons.forEach(button => { button.disabled = false; });
+      }
+    });
+    window.addEventListener("pagehide", () => { audio.pause(); if (url) URL.revokeObjectURL(url); });
+  });
 });

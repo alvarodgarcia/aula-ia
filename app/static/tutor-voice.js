@@ -140,8 +140,7 @@
   }
 
   function chooseVoice(style) {
-    const spanish = speech.getVoices().filter(voice => /^es(?:-|$)/i.test(voice.lang));
-    const peninsular = spanish.filter(voice => /^es[-_]es$/i.test(voice.lang));
+    const peninsular = speech.getVoices().filter(voice => /^es[-_]es$/i.test(voice.lang));
     const score = voice => {
       const name = voice.name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
       return (voice.lang.toLowerCase() === "es-es" ? 7 : 0)
@@ -149,7 +148,7 @@
         + (/natural|neural|premium|enhanced/.test(name) ? 8 : 0)
         + (voice.localService ? 2 : 0);
     };
-    return (peninsular.length ? peninsular : spanish).sort((left, right) => score(right) - score(left))[0];
+    return peninsular.sort((left, right) => score(right) - score(left))[0];
   }
 
   function playBrowser(playback, text, character) {
@@ -160,13 +159,19 @@
     const style = voicesByCharacter[character] ?? voicesByCharacter.nora;
     const utterance = new SpeechSynthesisUtterance(spokenText(text));
     const voice = chooseVoice(style);
-    utterance.lang = voice?.lang ?? "es-ES";
-    if (voice) utterance.voice = voice;
+    if (!voice) {
+      tutor.dataset.voiceSource = "unavailable-es-ES";
+      resetReading("Este dispositivo no tiene una voz de España disponible. Puedes leer el texto o instalar una voz es-ES.");
+      return;
+    }
+    tutor.dataset.voiceSource = "browser-es-ES";
+    utterance.lang = "es-ES";
+    utterance.voice = voice;
     utterance.pitch = style.pitch;
     utterance.rate = Number(tutor.dataset.rate) * style.pace;
     playback.stop = () => speech.cancel();
     utterance.onstart = () => {
-      if (current === playback) setState("speaking", "Leyendo en voz alta…");
+      if (current === playback) setState("speaking", "Voz del dispositivo · español de España.");
     };
     utterance.onend = () => {
       if (current === playback) resetReading();
@@ -190,15 +195,16 @@
         body: new URLSearchParams({ text, character, signature, csrf_token: question.elements.csrf_token.value }),
       });
       if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
-        throw new Error("Voz de OpenAI no disponible");
+        throw new Error("Proveedor de voz no disponible");
       }
-      clip = await response.blob();
+      clip = { data: await response.blob(), provider: response.headers.get("X-Aula-Voice-Provider") === "azure" ? "azure" : "openai" };
       if (current !== playback) return;
       if (!playback.audioContext) clips.set(key, clip);
     }
+    const providerLabel = clip.provider === "azure" ? "Azure Speech · España" : "OpenAI";
     if (playback.audioContext) {
       const context = playback.audioContext;
-      const buffer = await context.decodeAudioData(await clip.arrayBuffer());
+      const buffer = await context.decodeAudioData(await clip.data.arrayBuffer());
       if (current !== playback) return;
       if (context.state !== "running") throw new Error("Audio en pausa");
       const source = context.createBufferSource();
@@ -213,10 +219,11 @@
         source.disconnect();
       };
       source.start();
-      setState("speaking", "El tutor está hablando…");
+      tutor.dataset.voiceSource = clip.provider;
+      setState("speaking", `Voz generada por IA (${providerLabel}) · el tutor está hablando…`);
       return;
     }
-    const url = URL.createObjectURL(clip);
+    const url = URL.createObjectURL(clip.data);
     const audio = new Audio(url);
     let started = false;
     playback.stop = () => {
@@ -225,7 +232,10 @@
     };
     audio.onplaying = () => {
       started = true;
-      if (current === playback) setState("speaking", "Voz generada por IA · leyendo en voz alta…");
+      if (current === playback) {
+        tutor.dataset.voiceSource = clip.provider;
+        setState("speaking", `Voz generada por IA (${providerLabel}) · leyendo en voz alta…`);
+      }
     };
     audio.onended = () => {
       if (current === playback) resetReading();

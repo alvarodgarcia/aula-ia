@@ -13,6 +13,19 @@
   <a class="button button-secondary" href="/supervision">Supervisión del alumnado</a>
   <a class="button button-secondary" href="/ayuda">Cómo usar Aula IA</a>
 </nav>
+<details class="card section-block admin-voice-preview" id="probar-voces">
+  <summary><strong>Probar las voces del tutor</strong> · {{ tutor_voice_provider_label() }}</summary>
+  <p>Escucha una frase de cada personaje antes de usarlo con el alumno. Esta prueba utiliza el proveedor de voz configurado; no cambia el personaje elegido por el alumno.</p>
+  {% if not voice_ready %}<p class="notice">Falta configurar el proveedor de voz en el servidor. Para Azure, utiliza el recurso Speech gratuito F0 y el asistente de configuración.</p>{% endif %}
+  {% if profiles %}
+  <form method="post" action="/admin/voz/prueba" class="stack" data-voice-preview>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Adaptar el ritmo a este alumno<select name="profile_id">{% for p in profiles %}<option value="{{ p.id }}">{{ p.name }} · {{ p.course }} {{ p.stage }}</option>{% endfor %}</select></label>
+    <div class="study-actions">{% for character in ('lumo', 'nora', 'samir') %}<button class="button button-secondary" name="character" value="{{ character }}"{% if not voice_ready %} disabled{% endif %}>Escuchar a {{ character|capitalize }}</button>{% endfor %}</div>
+    <p data-voice-preview-status role="status"></p><audio data-voice-preview-audio controls hidden aria-label="Muestra de voz del tutor"></audio>
+  </form>
+  {% else %}<p>Crea un perfil para probar la voz con un ritmo adecuado a su edad.</p>{% endif %}
+</details>
 <div class="two-column">
   <section class="card"><div class="section-heading"><h2>Crear perfil</h2></div>
     <form method="post" action="/profiles" class="form-grid">

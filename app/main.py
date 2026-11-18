@@ -303,6 +303,7 @@ templates = Jinja2Templates(directory=ROOT / "templates")
 templates.env.globals["tutor_voice_signature"] = voice.voice_signature
 templates.env.globals["tutor_greetings"] = voice.GREETINGS
 templates.env.globals["tutor_conversation_notices"] = voice.CONVERSATION_NOTICES
+templates.env.globals["tutor_voice_provider_label"] = voice.provider_label
 templates.env.globals["tutor_conversation_available"] = lambda: bool(voice.voice_api_key())
 
 @app.on_event("startup")
@@ -338,7 +339,7 @@ def admin_session_version() -> str:
     return hmac.digest(os.environ["APP_SESSION_SECRET"].encode(),
                        os.environ.get("APP_ADMIN_PASSWORD", "").encode(), "sha256").hex()
 
-def reserve_security_limit(db: Session, category: str, identity: str, maximum: int, seconds: int) -> bool:
+def reserve_security_limit(db: Session, category: str, identity: str, maximum: int, seconds: int, amount: int = 1) -> bool:
     bucket = hashlib.sha256(f"{category}:{identity}".encode()).hexdigest()
     now = datetime.now(timezone.utc)
     seed = {"bucket": bucket, "window_start": now, "requests": 0}
@@ -351,9 +352,9 @@ def reserve_security_limit(db: Session, category: str, identity: str, maximum: i
     start = counter.window_start.replace(tzinfo=counter.window_start.tzinfo or timezone.utc)
     if now - start >= timedelta(seconds=seconds):
         counter.window_start, counter.requests = now, 0
-    allowed = counter.requests < maximum
+    allowed = amount > 0 and counter.requests + amount <= maximum
     if allowed:
-        counter.requests += 1
+        counter.requests += amount
     db.commit()
     return allowed
 
@@ -2162,6 +2163,69 @@ def choose_tutor(request: Request, character: str = Form(...), csrf_token: str =
         db.commit()
     return JSONResponse({"character": character})
 
+async def generated_voice(db: Session, profile: Profile, text: str, character: str, *, preview: bool = False) -> Response:
+    profile_id = profile.id
+    age_group = student_age_group(profile.age)
+    policy = db.get(StudentTutorPolicy, profile_id)
+    daily_limit = policy.daily_limit if policy else DEFAULT_DAILY_TUTOR_LIMIT
+    if daily_limit == 0 and not preview:
+        raise HTTPException(status_code=429, detail="El adulto ha pausado la IA de este perfil.")
+    if not voice.synthesis_ready():
+        raise HTTPException(status_code=503, detail="Configura el proveedor de voz en el servidor antes de probarlo.")
+    identity = voice.cache_identity(character)
+    cache_key = hashlib.sha256(f"{profile_id}:{character}:{age_group}:{identity}:{text}".encode()).hexdigest()
+    headers = {"Cache-Control": "no-store", "X-Aula-Voice-Provider": voice.provider()}
+    clip = db.get(VoiceClip, cache_key)
+    if clip is not None:
+        return Response(clip.data, media_type="audio/wav", headers=headers)
+    if not VOICE_SLOT.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="La voz está ocupada. Inténtalo en un momento.")
+    try:
+        if not preview and not reserve_security_limit(db, "voice-generation", str(profile_id), daily_limit * 3, 86400):
+            raise HTTPException(status_code=429, detail="Has llegado al límite de generaciones de voz.")
+        if voice.provider() == "azure":
+            if not reserve_security_limit(db, "azure-voice-rate", "family", 18, 60):
+                raise HTTPException(status_code=429, detail="Espera un minuto antes de generar más voces de prueba.")
+            month = datetime.now(timezone.utc).strftime("%Y-%m")
+            amount = voice.azure_voice.reserved_characters(text, character, age_group)
+            if not reserve_security_limit(db, "azure-voice-month", month, 400000, 40 * 86400, amount):
+                raise HTTPException(status_code=429, detail="Se ha alcanzado el límite mensual local de voz Azure. Puedes seguir leyendo y escribiendo.")
+        entry = audit_event(db, profile_id, "Prueba voz adulto" if preview else "Lectura en voz", text, "recibida")
+        db.commit()
+        try:
+            audio = await voice.greeting(text, character, age_group, voice.synthesis_key(), DATA_DIR / "tutor-greetings")
+        except Exception as exc:
+            logger.warning("Tutor IA: Falló la síntesis de voz (%s)", type(exc).__name__)
+            finish_student_request(db, entry, "error de voz")
+            raise HTTPException(status_code=502, detail="El proveedor de voz no está disponible. Revisa su configuración o cuota.") from None
+        db.execute(delete(VoiceClip).where(VoiceClip.created_at < datetime.now(timezone.utc) - timedelta(days=1))
+                   .execution_options(synchronize_session=False))
+        db.merge(VoiceClip(key=cache_key, data=audio))
+        finish_student_request(db, entry, "apoyo")
+        return Response(audio, media_type="audio/wav", headers=headers)
+    finally:
+        VOICE_SLOT.release()
+
+
+@app.post("/admin/voz/prueba")
+async def preview_voice(request: Request, profile_id: int = Form(...), character: str = Form(...),
+                        csrf_token: str = Form(...)) -> Response:
+    if not authenticated(request):
+        return JSONResponse({"error": "Solo el adulto puede probar la voz desde este panel."}, status_code=403)
+    check_csrf(request, csrf_token)
+    if character not in voice.VOICES:
+        raise HTTPException(status_code=400, detail="Personaje no disponible")
+    with db_session() as db:
+        profile = db.get(Profile, profile_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+        text = f"Hola, soy {character.capitalize()}. Vamos a practicar juntos. Fíjate en este ejercicio: cinco veces doce. ¿Qué paso darías primero?"
+        try:
+            return await generated_voice(db, profile, text, character, preview=True)
+        except HTTPException as exc:
+            return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+
+
 @app.post("/tutor/voz")
 async def tutor_voice(
     request: Request, text: str = Form(..., max_length=voice.MAX_TEXT + 20),
@@ -2180,36 +2244,7 @@ async def tutor_voice(
         profile = db.get(Profile, profile_id)
         if profile is None or character not in voice.VOICES:
             raise HTTPException(status_code=400, detail="Personaje no disponible")
-        age_group = student_age_group(profile.age)
-        policy = db.get(StudentTutorPolicy, profile_id)
-        daily_limit = policy.daily_limit if policy else DEFAULT_DAILY_TUTOR_LIMIT
-        if daily_limit == 0:
-            raise HTTPException(status_code=429, detail="El adulto ha pausado la IA de este perfil.")
-        cache_key = hashlib.sha256(f"{profile_id}:{character}:{age_group}:{voice.MODEL}:{voice.STYLE_REVISION}:{text}".encode()).hexdigest()
-        clip = db.get(VoiceClip, cache_key)
-        if clip is not None:
-            return Response(clip.data, media_type="audio/wav", headers={"Cache-Control": "no-store"})
-    if not VOICE_SLOT.acquire(blocking=False):
-        raise HTTPException(status_code=429, detail="La voz está ocupada. Inténtalo en un momento.")
-    try:
-        with db_session() as db:
-            if not reserve_security_limit(db, "voice-generation", str(profile_id), daily_limit * 3, 86400):
-                raise HTTPException(status_code=429, detail="Has llegado al límite de generaciones de voz.")
-            entry = audit_event(db, profile_id, "Lectura en voz", text, "recibida")
-            db.commit()
-            try:
-                audio = await voice.greeting(text, character, age_group, voice.voice_api_key(), DATA_DIR / "tutor-greetings")
-            except Exception as exc:
-                logger.warning("Tutor IA: Falló la síntesis de voz (%s)", type(exc).__name__)
-                finish_student_request(db, entry, "error de voz")
-                raise HTTPException(status_code=502, detail="Voz de OpenAI no disponible") from None
-            db.execute(delete(VoiceClip).where(VoiceClip.created_at < datetime.now(timezone.utc) - timedelta(days=1))
-                       .execution_options(synchronize_session=False))
-            db.merge(VoiceClip(key=cache_key, data=audio))
-            finish_student_request(db, entry, "apoyo")
-    finally:
-        VOICE_SLOT.release()
-    return Response(audio, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+        return await generated_voice(db, profile, text, character)
 
 @app.post("/logout")
 def logout(request: Request, csrf_token: str = Form(...)) -> RedirectResponse:
@@ -2330,6 +2365,7 @@ def render_adult_dashboard(
         func.coalesce(func.sum(AIUsage.output_tokens), 0), func.coalesce(func.sum(AIUsage.cost_usd), 0.0)
     ).filter(AIUsage.created_at >= month).one()
     return render(request, "index.html", {
+        "voice_ready": voice.synthesis_ready(),
         "profiles": profiles, "documents": documents, "exercises": exercises, "packs": packs,
         "upload_accept": UPLOAD_ACCEPT, "photo_accept": PHOTO_ACCEPT, "max_material_files": MAX_MATERIAL_FILES,
         "student_profile_ids": student_profile_ids, "login_codes": login_codes,

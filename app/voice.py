@@ -5,11 +5,13 @@ import io
 import json
 import os
 import wave
+import hashlib
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
 from websockets.asyncio.client import connect
+from . import azure_voice
 
 
 MODEL = "gpt-realtime-2.1-mini"
@@ -35,6 +37,28 @@ CONVERSATION_NOTICES = {
     "noise": "Me cuesta distinguir tu voz del sonido de fondo. Busca un lugar más tranquilo o pulsa Finalizar conversación si prefieres seguir después.",
 }
 greeting_lock = asyncio.Lock()
+
+
+def provider() -> str:
+    return os.getenv("TUTOR_VOICE_PROVIDER", "openai").strip().lower()
+
+
+def provider_label() -> str:
+    return {"openai": "OpenAI", "azure": "Azure Speech · España"}.get(provider(), "Proveedor no válido")
+
+
+def synthesis_ready() -> bool:
+    return azure_voice.configured() if provider() == "azure" else bool(voice_api_key()) if provider() == "openai" else False
+
+
+def synthesis_key() -> str:
+    return os.getenv("AZURE_SPEECH_KEY", "").strip() if provider() == "azure" else voice_api_key()
+
+
+def cache_identity(character: str) -> str:
+    if provider() == "azure":
+        return f"azure:{azure_voice.region()}:{azure_voice.VOICES[character]}:{STYLE_REVISION}"
+    return f"openai:{MODEL}:{character}:{STYLE_REVISION}"
 
 
 def voice_api_key() -> str:
@@ -64,13 +88,17 @@ async def transcribe_class_audio(audio: bytes, extension: str, api_key: str) -> 
 
 def voice_signature(profile_id: int, text: str) -> str:
     text = voice_text(text)
-    if not text or len(text) > MAX_TEXT or not voice_api_key():
+    if not text or len(text) > MAX_TEXT or not synthesis_ready():
         return ""
     message = f"aula-ia:tutor-voz:{profile_id}:{text}".encode()
     return hmac.digest(os.environ["APP_SESSION_SECRET"].encode(), message, "sha256").hex()
 
 
 async def synthesize(text: str, character: str, age_group: str, api_key: str) -> bytes:
+    if provider() == "azure":
+        return await azure_voice.synthesize(text, character, age_group, api_key)
+    if provider() != "openai":
+        raise ValueError("Proveedor de voz no válido")
     voice, tone = VOICES[character]
     pace = {
         "early": "Usa un ritmo tranquilo y cercano, con pausas cortas entre ideas; mantén las palabras fluidas, sin separar sílabas ni adoptar voz de bebé.",
@@ -131,7 +159,8 @@ async def synthesize(text: str, character: str, age_group: str, api_key: str) ->
 async def greeting(text: str, character: str, age_group: str, api_key: str, cache: Path) -> bytes:
     if text != GREETINGS[character]:
         return await synthesize(text, character, age_group, api_key)
-    path = cache / f"{MODEL}-{STYLE_REVISION}-{character}-{age_group}.wav"
+    identity = hashlib.sha256(cache_identity(character).encode()).hexdigest()[:24]
+    path = cache / f"{identity}-{character}-{age_group}.wav"
     async with greeting_lock:
         if path.is_file():
             return path.read_bytes()

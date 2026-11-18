@@ -4,6 +4,7 @@
 {% set is_hint = tutor_reply and tutor_reply.kind == "hint" %}
 <aside class="card tutor-card student-tutor" id="student-tutor" data-state="idle" data-profile="{{ profile.id }}"
        data-saved-character="{{ saved_tutor or '' }}" data-greet-on-entry="{{ 'yes' if greet_on_entry else 'no' }}"
+       data-voice-provider="{{ tutor_voice_provider_label() }}"
        data-rate="{{ 0.9 if age_group == 'early' else 0.96 if age_group == 'primary' else 1 }}">
   <details{% if not in_exercise or age_group != "teen" or tutor_reply %} open{% endif %}>
     <summary class="tutor-toggle">

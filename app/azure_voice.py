@@ -6,6 +6,7 @@ import wave
 from xml.sax.saxutils import escape
 
 import httpx
+from . import accounting
 
 
 VOICES = {"lumo": "es-ES-ElviraNeural", "nora": "es-ES-XimenaNeural", "samir": "es-ES-AlvaroNeural"}
@@ -40,6 +41,20 @@ def reserved_characters(text: str, character: str, age_group: str) -> int:
 
 
 async def synthesize(text: str, character: str, age_group: str, key: str) -> bytes:
+    event_id = accounting.begin("azure_voice", "azure", VOICES[character], "sintetizar",
+                                text_characters=len(text), azure_units=reserved_characters(text, character, age_group))
+    try:
+        audio = await synthesize_audio(text, character, age_group, key)
+        with wave.open(io.BytesIO(audio), "rb") as wav:
+            duration = wav.getnframes() / wav.getframerate()
+        accounting.finish(event_id, audio_seconds=duration)
+        return audio
+    except Exception:
+        accounting.fail(event_id)
+        raise
+
+
+async def synthesize_audio(text: str, character: str, age_group: str, key: str) -> bytes:
     endpoint = f"https://{region()}.tts.speech.microsoft.com/cognitiveservices/v1"
     headers = {"Ocp-Apim-Subscription-Key": key, "Content-Type": "application/ssml+xml",
                "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "AulaIA"}

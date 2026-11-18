@@ -11,6 +11,7 @@
   <a class="button button-secondary" href="#biblioteca">Biblioteca ({{ documents|length }})</a>
   <a class="button button-secondary" href="#anadir-pdf">Añadir PDF o foto</a>
   <a class="button button-secondary" href="/supervision">Supervisión del alumnado</a>
+  <a class="button button-secondary" href="/consumo">Consumo y límites de IA</a>
   <a class="button button-secondary" href="/ayuda">Cómo usar Aula IA</a>
 </nav>
 <details class="card section-block admin-voice-preview" id="probar-voces">
@@ -141,9 +142,11 @@
   <a class="exercise-row" href="/exercise/{{ e.id }}"><span class="status-dot {% if e.solved %}done{% endif %}"></span><span class="exercise-row-main"><strong>{{ e.topic }}</strong><small>{{ e.profile.name }} · {{ e.subject }} · {{ e.profile.course }}</small></span><span class="tag">{% if e.solved %}Completado{% else %}{{ e.attempts_count }} intentos{% endif %}</span></a>
   {% endfor %}</div>{% else %}<p class="empty">Aún no hay ejercicios.</p>{% endif %}
 </section>
-<details class="card section-block usage-details">
-  <summary>Uso de IA este mes</summary>
-  <p>{{ provider|upper }} · {{ usage.calls }} consultas · {{ usage.input }} tokens de entrada · {{ usage.output }} de salida</p>
-  {% if provider|lower == "openai" %}<p>Coste estimado de consultas de texto · USD {{ "%.4f"|format(usage.cost) }}</p>{% endif %}
-</details>
+<section class="card section-block usage-details">
+  <div class="section-heading"><h2>Consumo de IA este mes</h2><a href="/consumo">Ver por alumno y configurar límites →</a></div>
+  <p>{{ consumption_summary.totals.calls }} llamadas registradas · {{ consumption_summary.totals.input + consumption_summary.totals.output }} tokens comunicados · {{ consumption_summary.totals.cache }} lecturas reutilizadas.</p>
+  {% set budget = consumption_summary.policies.get(0) %}
+  {% if budget and budget.limit and consumption_summary.monthly[0] >= budget.limit * 0.8 %}<p class="notice" role="status">El consumo de texto o sus reservas se acercan al presupuesto mensual de la familia. {% if budget.block %}El bloqueo está activado.{% else %}Solo se muestran avisos.{% endif %} <a href="/consumo">Revisar consumo</a>.</p>{% endif %}
+  <p class="source-ref">La voz Azure se mide en caracteres y reservas locales. El detalle distingue datos medidos, estimaciones e histórico sin alumno.</p>
+</section>
 {% endblock %}

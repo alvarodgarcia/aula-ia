@@ -96,8 +96,9 @@ class AzureVoiceTests(unittest.TestCase):
         self.assertNotIn('test-azure-key-for-mocked-requests',page.text)
         self.assertNotIn('test-azure-key-for-mocked-requests',self.admin.get('/privacidad').text)
         from pathlib import Path
-        Path(r'C:/CodexWork/aula-ia-previews/azure-panel-adulto.html').write_text(page.text,encoding='utf-8')
-        Path(r'C:/CodexWork/aula-ia-previews/azure-alumno.html').write_text(self.client.get('/mis-tareas').text,encoding='utf-8')
+        if os.getenv('AULA_PREVIEW_DIR'):
+            Path(os.environ['AULA_PREVIEW_DIR'],'azure-panel-adulto.html').write_text(page.text,encoding='utf-8')
+            Path(os.environ['AULA_PREVIEW_DIR'],'azure-alumno.html').write_text(self.client.get('/mis-tareas').text,encoding='utf-8')
 
     def test_provider_failure_has_no_openai_fallback(self):
         with self.mock_transport(lambda r:httpx.Response(401,content=b'no')),patch.object(voice,'connect') as realtime:

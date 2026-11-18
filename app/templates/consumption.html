@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% macro budget_meter(used, budget, label) %}
+  <div class="usage-budget">
+    <strong>{{ label }}</strong>
+    <p>{{ used }} tokens de texto y reservas este mes{% if budget.limit %} de {{ budget.limit }}{% endif %}.</p>
+    {% if budget.limit %}
+    <progress max="{{ budget.limit }}" value="{{ [used, budget.limit]|min }}" aria-label="{{ label }}"></progress>
+    {% if used >= budget.limit %}<p class="usage-alert" role="status">Presupuesto alcanzado. {{ "Se bloquean nuevas llamadas de texto." if budget.block else "Solo aviso: el bloqueo está desactivado." }}</p>
+    {% elif used >= budget.limit * 0.95 %}<p class="usage-alert" role="status">Queda un 5 % o menos del presupuesto.</p>
+    {% elif used >= budget.limit * 0.8 %}<p class="usage-alert" role="status">Has utilizado al menos el 80 % del presupuesto.</p>{% endif %}
+    {% else %}<p class="source-ref">Sin presupuesto de tokens configurado.</p>{% endif %}
+  </div>
+{% endmacro %}
+{% macro budget_form(id, label, budget) %}
+  <form class="stack usage-limit-form" method="post" action="/consumo/limites">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="scope_id" value="{{ id }}">
+    <label>{{ label }}<input type="number" name="monthly_tokens" min="0" max="1000000000" value="{{ budget.limit }}" required></label>
+    <label class="usage-checkbox"><input type="checkbox" name="block" value="true"{% if budget.block %} checked{% endif %}> Bloquear nuevas llamadas de texto si no queda presupuesto.</label>
+    <button class="button button-secondary">Guardar presupuesto</button>
+  </form>
+{% endmacro %}
+{% block content %}
+<a class="back-link" href="/">← Panel de adulto</a>
+<header class="hero admin-hero"><div><span class="eyebrow">Supervisión familiar</span><h1>Consumo y límites de IA</h1><p>Consulta el consumo total y por alumno. Configura avisos y decide cuándo bloquear las consultas de texto.</p></div></header>
+<form method="get" action="/consumo" class="card usage-filters">
+  <label>Periodo<select name="periodo">{% for value,label in [('mes','Este mes'),('hoy','Hoy (UTC)'),('semana','Últimos 7 días'),('todo','Todo el histórico')] %}<option value="{{ value }}"{% if value == report.period %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Alumno<select name="perfil"><option value="0">Toda la familia</option>{% for p in profiles %}<option value="{{ p.id }}"{% if p.id == report.profile_filter %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></label>
+  <button class="button button-primary">Consultar</button>
+</form>
+<div class="stats-grid usage-stats">
+  <section class="card stat"><span>Tokens comunicados</span><strong>{{ report.totals.input + report.totals.output }}</strong><small>{{ report.totals.input }} de entrada · {{ report.totals.output }} de salida. La entrada ya incluye {{ report.totals.cached_tokens }} en caché.</small></section>
+  <section class="card stat"><span>Llamadas registradas</span><strong>{{ report.totals.calls }}</strong><small>{{ report.totals.errors }} con error · {{ report.totals.cache }} lecturas en caché</small></section>
+  <section class="card stat"><span>Texto solicitado a Azure</span><strong>{{ report.totals.azure_chars }}</strong><small>Caracteres contados localmente; no son tokens ni una factura.</small></section>
+  <section class="card stat"><span>Audio transcrito comunicado</span><strong>{{ "%.1f"|format(report.totals.seconds / 60) }} min</strong><small>{{ report.totals.audio_unknown }} llamadas sin duración comunicada.</small></section>
+</div>
+<p class="source-ref">{{ report.totals.unknown }} llamadas sin un contador completo de tokens. Una pregunta puede generar varias llamadas, incluidas las comprobaciones pedagógicas. No se cuentan como consumo nuevo las lecturas reutilizadas.</p>
+<p class="source-ref">Este panel solo conoce las llamadas registradas por Aula IA. No consulta tu saldo de OpenAI ni el consumo de otras aplicaciones con las mismas claves.</p>
+<div class="two-column section-block">
+  <section class="card">
+    <h2>Presupuesto mensual de la familia</h2>
+    {{ budget_meter(report.monthly[0], report.policies[0], 'Toda la familia') }}
+    {{ budget_form(0, 'Tokens de texto al mes (0 = sin presupuesto)', report.policies[0]) }}
+    <p class="source-ref">Los presupuestos usan meses UTC y se comparten entre las actividades de los alumnos y las del adulto. Se reserva un margen conservador antes de llamar al proveedor; el bloqueo puede ocurrir antes de agotar los tokens medidos. Las reservas sin confirmar también ocupan presupuesto.</p>
+  </section>
+  <section class="card">
+    <h2>Reserva global de voz Azure este mes</h2>
+    <p><strong>{{ azure_reserved }}</strong> de 400000 unidades locales reservadas.</p>
+    <progress value="{{ [azure_reserved,400000]|min }}" max="400000" aria-label="Reserva local Azure"></progress>
+    {% if azure_reserved >= 400000 %}<p class="usage-alert">Límite local de Azure alcanzado. Se bloquean nuevas generaciones; los clips existentes pueden reutilizarse.</p>{% elif azure_reserved >= 320000 %}<p class="usage-alert">La reserva local de Azure ha superado el 80 %.</p>{% endif %}
+    <p>Este contador incluye las reservas conservadoras de la instalación, también las anteriores al nuevo monitor. El límite local sigue activo aunque el presupuesto de tokens esté en modo aviso.</p>
+    <p class="source-ref">No muestra el saldo de Azure ni certifica tu nivel F0. Otros usos de la misma clave pueden consumir cuota fuera de Aula IA. Consulta el portal del proveedor para la facturación real.</p>
+    <p>Coste estimado de texto en el periodo: <strong>USD {{ "%.4f"|format(report.totals.text_cost) }}</strong>.</p>
+    <p class="source-ref">Calculado con las tarifas configuradas cuando se hizo cada llamada. No incluye voz ni transcripción y no equivale a una factura.</p>
+    {% if report.totals.cost_unknown %}<p class="source-ref">Estimación parcial: {{ report.totals.cost_unknown }} llamadas de texto sin coste estimable.</p>{% endif %}
+  </section>
+</div>
+<section class="card section-block">
+  <h2>Consumo por alumno</h2>
+  <p>Se atribuyen al perfil las llamadas del alumno y las que hace el adulto para él. Los presupuestos y las peticiones de hoy se muestran aunque filtres otro periodo.</p>
+  <div class="usage-table-wrap"><table class="usage-table"><thead><tr><th>Alumno</th><th>Tokens texto</th><th>Tokens totales comunicados</th><th>Texto Azure</th><th>Peticiones de IA hoy</th></tr></thead><tbody>
+  {% for p in profiles if not report.profile_filter or p.id == report.profile_filter %}{% set row=by_id.get(p.id) %}
+    <tr><th scope="row">{{ p.name }}{% if row %}<small>{{ row.calls }} llamadas · {{ row.adult_calls }} del adulto</small>{% endif %}</th><td>{{ row.text_tokens if row else 0 }}</td><td>{{ row.input + row.output if row else 0 }}</td><td>{{ row.azure_chars if row else 0 }} caracteres</td><td>{{ daily.get(p.id,0) }} / {{ daily_limits.get(p.id,default_daily_limit) }}</td></tr>
+  {% else %}<tr><td colspan="5">Todavía no hay perfiles.</td></tr>{% endfor %}
+  {% if by_id.get(none) %}{% set row=by_id[none] %}<tr><th scope="row">Sin alumno asignado</th><td>{{ row.text_tokens }}</td><td>{{ row.input + row.output }}</td><td>{{ row.azure_chars }}</td><td>—</td></tr>{% endif %}
+  </tbody></table></div>
+  {% if report.legacy_count %}<p class="notice">{{ report.legacy_count }} registros antiguos no tenían alumno asociado. Se conservan en el total y en «Sin alumno asignado»; no se ha inventado un reparto.</p>{% endif %}
+</section>
+<section class="section-block"><h2>Presupuestos de cada alumno</h2><div class="two-column">
+{% for p in profiles if not report.profile_filter or p.id == report.profile_filter %}<details class="card"><summary><strong>{{ p.name }}</strong> · presupuesto de texto</summary>
+  {{ budget_meter(report.monthly.get(p.id,0), report.policies[p.id], p.name) }}
+  {{ budget_form(p.id, 'Tokens de texto al mes (0 = sin presupuesto)', report.policies[p.id]) }}
+  <p class="source-ref">Además se aplica el presupuesto familiar y el límite diario de peticiones que ya tenga este alumno.</p>
+</details>{% endfor %}</div></section>
+<section class="card section-block"><h2>Últimas llamadas del periodo</h2>
+  <p>{{ report.totals.reserved }} tokens reservados sin confirmar en los registros seleccionados.</p>
+  <div class="usage-table-wrap"><table class="usage-table"><thead><tr><th>Fecha UTC</th><th>Alumno</th><th>Proveedor y actividad</th><th>Consumo comunicado</th><th>Estado</th></tr></thead><tbody>
+  {% for e in report.recent %}<tr><td>{{ e.created_at.strftime('%d/%m %H:%M') }}</td><td>{% for p in profiles if p.id == e.profile_id %}{{ p.name }}{% else %}Sin asignar{% endfor %}<small>{{ 'Adulto' if e.actor == 'adult' else 'Alumno' if e.actor == 'student' else 'Sin identificar' }}</small></td><td>{{ e.provider }} · {{ e.task }}<small>{{ e.model }}</small></td><td>{% if e.kind == 'voice_cache' %}Caché, sin nueva llamada{% elif e.provider == 'azure' %}{{ e.text_characters }} caracteres de texto{% else %}{{ e.input_tokens if e.input_tokens is not none else '—' }} entrada / {{ e.output_tokens if e.output_tokens is not none else '—' }} salida{% endif %}</td><td>{{ {'ok':'Registrado','pending':'Pendiente','error':'Error'}.get(e.status,e.status) }}{% if e.reserved_tokens %}<small>Reserva: {{ e.reserved_tokens }}</small>{% endif %}</td></tr>{% else %}<tr><td colspan="5">Sin llamadas registradas en este periodo.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

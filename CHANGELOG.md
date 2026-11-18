@@ -1,5 +1,13 @@
 # Cambios de Aula IA
 
+## 1.2.0 · 2026-11-18
+
+- Panel de adulto «Consumo y límites de IA», con filtros de periodo y alumno, totales y detalle de llamadas.
+- Registro por perfil y actor de tokens comunicados, transcripciones, voz Azure y lecturas en caché. Los errores de contenido y las revisiones pedagógicas también se contabilizan.
+- Presupuestos mensuales de tokens de texto para la familia y por alumno, con avisos al 80 %, 95 % y al alcanzar el presupuesto; bloqueo opcional mediante reservas previas y límites de salida.
+- La reserva global de Azure sigue visible y activa. Se distinguen caracteres, tokens, duración comunicada y estimaciones, sin inferir el saldo del proveedor.
+- Histórico previo conservado como consumo sin alumno asignado. Nuevas tablas de registro y presupuestos, sin alterar la estructura de los datos existentes.
+
 ## Prueba de voz Azure sobre 1.1.0 · 2026-11-18
 
 - Proveedor de síntesis Azure Speech opcional con voces regionales es-ES: Elvira (Lumo), Ximena (Nora) y Álvaro (Samir). OpenAI conserva las respuestas y transcripciones.

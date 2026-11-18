@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 from urllib.parse import quote, urlencode
 import fitz, httpx, pytesseract
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
-from . import learning, voice
+from . import accounting, learning, voice
 from .security import SecurityMiddleware
 
 ROOT = Path(__file__).resolve().parent
@@ -286,9 +286,50 @@ class AIUsage(Base):
     elapsed_ms: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+accounting.configure(engine, AIUsage)
+
+
+async def consumption_scope(request: Request):
+    profile_id, actor = None, "unknown"
+    if request.method == "POST":
+        with db_session() as db:
+            if authenticated(request):
+                actor = "adult"
+                candidate = request.path_params.get("profile_id")
+                if candidate is None:
+                    form = await request.form()
+                    candidate = form.get("profile_id")
+                try:
+                    candidate = int(candidate) if candidate is not None else None
+                except (ValueError, TypeError):
+                    candidate = None
+                if candidate is not None and 0 < candidate <= 2147483647 and db.get(Profile, candidate) is not None:
+                    profile_id = candidate
+                for param, model in (("exercise_id", Exercise), ("document_id", StudyDocument)):
+                    if profile_id is None and request.path_params.get(param) is not None:
+                        try:
+                            object_id = int(request.path_params[param])
+                        except (TypeError, ValueError):
+                            object_id = 0
+                        item = db.get(model, object_id) if 0 < object_id <= 2147483647 else None
+                        profile_id = item.profile_id if item else None
+            else:
+                profile_id = student_id(request, db)
+                actor = "student" if profile_id is not None else "unknown"
+    token = accounting.context.set((profile_id, actor))
+    calls_token = accounting.started_calls.set(0)
+    blocked_token = accounting.blocked_before_call.set(False)
+    try:
+        yield
+    finally:
+        accounting.context.reset(token)
+        accounting.started_calls.reset(calls_token)
+        accounting.blocked_before_call.reset(blocked_token)
+
+
 PUBLIC_DEPLOYMENT = os.getenv("APP_PUBLIC", "false").lower() == "true"
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("APP_ALLOWED_HOSTS", "").split(",") if host.strip()]
-app = FastAPI(title=os.getenv("APP_NAME", "Aula IA"), docs_url=None if PUBLIC_DEPLOYMENT else "/docs",
+app = FastAPI(title=os.getenv("APP_NAME", "Aula IA"), dependencies=[Depends(consumption_scope)], docs_url=None if PUBLIC_DEPLOYMENT else "/docs",
               redoc_url=None if PUBLIC_DEPLOYMENT else "/redoc", openapi_url=None if PUBLIC_DEPLOYMENT else "/openapi.json")
 if ALLOWED_HOSTS:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS, www_redirect=False)
@@ -319,6 +360,7 @@ def startup() -> None:
     ):
         raise RuntimeError("La publicación requiere APP_COOKIE_SECURE=true y APP_ALLOWED_HOSTS con el dominio autorizado")
     Base.metadata.create_all(engine)
+    accounting.Base.metadata.create_all(engine)
     with db_session() as db:
         missing = db.scalars(select(StudentAccess.profile_id).where(
             StudentAccess.profile_id.not_in(select(StudentLoginCode.profile_id)),
@@ -655,17 +697,30 @@ async def ai_request(system: str, user: str, task: str, json_mode: bool = False)
         body["temperature"] = 0.3
     if json_mode:
         body["response_format"] = {"type": "json_object"}
+    generation = task in {"generar_ejercicio", "replicar_tarea", "repaso_examen", "pack_repaso"}
+    output_limit = max(256, min(16000, int(os.getenv(
+        "AI_MAX_GENERATION_TOKENS" if generation else "AI_MAX_OUTPUT_TOKENS", "12000" if generation else "4096"))))
+    body["max_completion_tokens" if provider == "openai" else "max_tokens"] = output_limit
+    reservation = len(system.encode()) + len(user.encode()) + 1024 + output_limit
+    event_id = accounting.begin("text", provider, model, task, reserved_tokens=reservation)
     started = time.perf_counter()
-    async with httpx.AsyncClient(timeout=float(os.getenv("AI_TIMEOUT_SECONDS", "90"))) as client:
-        response = await client.post(f"{base_url}/chat/completions", headers=headers, json=body)
-        if response.status_code >= 400 and json_mode and provider == "ollama":
-            body.pop("response_format", None)
+    try:
+        async with httpx.AsyncClient(timeout=float(os.getenv("AI_TIMEOUT_SECONDS", "90"))) as client:
             response = await client.post(f"{base_url}/chat/completions", headers=headers, json=body)
-        response.raise_for_status()
-    data = response.json()
+            if response.status_code >= 400 and json_mode and provider == "ollama":
+                accounting.fail(event_id, rejected=True)
+                event_id = accounting.begin("text", provider, model, task, reserved_tokens=reservation)
+                body.pop("response_format", None)
+                response = await client.post(f"{base_url}/chat/completions", headers=headers, json=body)
+            response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            raise ValueError("Respuesta de IA no válida")
+    except Exception as exc:
+        accounting.fail(event_id, rejected=isinstance(exc, httpx.HTTPStatusError) and 400 <= exc.response.status_code < 500)
+        raise
     elapsed = int((time.perf_counter() - started) * 1000)
-    choice = data.get("choices", [{}])[0].get("message", {})
-    usage = data.get("usage") or {}
+    usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
     in_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
     out_tokens = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
     cost = 0.0
@@ -673,22 +728,34 @@ async def ai_request(system: str, user: str, task: str, json_mode: bool = False)
         in_rate = float(os.getenv("AI_OPENAI_INPUT_USD_PER_MILLION", "0.10"))
         out_rate = float(os.getenv("AI_OPENAI_OUTPUT_USD_PER_MILLION", "0.50"))
         cost = (in_tokens * in_rate + out_tokens * out_rate) / 1_000_000
+    measured = accounting.token_counts(usage)
+    accounting.finish(event_id, usage=usage, cost_usd=cost if measured[0] is not None and measured[1] is not None else None)
+    choices = data.get("choices") or []
+    choice = choices[0].get("message", {}) if choices else {}
     return {
+        "_metered_id": event_id,
         "text": choice.get("content") or "", "provider": provider, "model": model,
         "input_tokens": in_tokens, "output_tokens": out_tokens, "cost_usd": cost,
         "elapsed_ms": elapsed, "task": task,
     }
 
 def log_usage(db: Session, result: dict[str, Any]) -> None:
-    db.add(AIUsage(
+    if result.get("_metered_id"):
+        db.commit()
+        return
+    record = AIUsage(
         provider=result["provider"], model=result["model"], task=result["task"],
         input_tokens=result["input_tokens"], output_tokens=result["output_tokens"],
         cost_usd=result["cost_usd"], elapsed_ms=result["elapsed_ms"],
-    ))
+    )
+    db.add(record)
+    db.flush()
+    event_id = accounting.legacy_event(db, record)
     db.commit()
+    result["_metered_id"] = event_id
 
 def log_tutor_failure(error: Exception) -> None:
-    if isinstance(error, (AIConfigurationError, TutorResponseError)):
+    if isinstance(error, (AIConfigurationError, TutorResponseError, accounting.BudgetExceeded)):
         reason = str(error)
     elif isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
@@ -713,6 +780,10 @@ def log_tutor_failure(error: Exception) -> None:
     else:
         reason = f"Fallo interno ({type(error).__name__})"
     logger.error("Tutor IA: %s", reason)
+
+
+def failure_notice(error: Exception, default: str) -> str:
+    return str(error) if isinstance(error, accounting.BudgetExceeded) else default
 
 def tutor_history(db: Session, profile_id: int, limit: int = TUTOR_HISTORY_LIMIT) -> list[TutorExchange]:
     recent = db.scalars(
@@ -1085,6 +1156,8 @@ def start_student_request(db: Session, profile_id: int, activity: str, detail: s
     return entry
 
 def finish_student_request(db: Session, entry: StudentAudit, outcome: str, reply: str = "") -> None:
+    if accounting.blocked_before_call.get() and accounting.started_calls.get() == 0:
+        entry.uses_quota = False
     entry.outcome, entry.reply = outcome, reply[:1600].replace("\x00", "")
     db.commit()
 
@@ -1564,7 +1637,7 @@ async def class_note(
                     "asignatura": subject, "tema": topic, "pregunta": guidance,
                 }, {})
                 finish_student_request(db, entry, "apoyo", guidance)
-            except StudyRequestBlocked as exc:
+            except (StudyRequestBlocked, accounting.BudgetExceeded) as exc:
                 guidance = str(exc)
                 if entry.uses_quota:
                     finish_student_request(db, entry, "rechazada", guidance)
@@ -1815,7 +1888,7 @@ async def class_revision(
             pack = await prepare_exam_review(db, profile, filters, notes)
             finish_student_request(db, entry, "apoyo", f"Repaso · pack {pack.id}")
             return RedirectResponse(f"/packs/{pack.id}", status_code=303)
-        except StudyRequestBlocked as exc:
+        except (StudyRequestBlocked, accounting.BudgetExceeded) as exc:
             finish_student_request(db, entry, "rechazada", str(exc))
             request.session["notice"] = str(exc)
         except Exception as exc:
@@ -1946,7 +2019,7 @@ async def student_review(exercise_id: int, request: Request, csrf_token: str = F
             db.rollback()
             log_tutor_failure(exc)
             finish_student_request(db, entry, "error")
-            request.session["notice"] = "No se pudo preparar otra vez el ejercicio. Inténtalo más tarde."
+            request.session["notice"] = failure_notice(exc, "No se pudo preparar otra vez el ejercicio. Inténtalo más tarde.")
             return RedirectResponse("/mis-tareas/errores", status_code=303)
 
 @app.post("/mis-tareas/tutor")
@@ -2023,7 +2096,7 @@ async def ask_profile_tutor(
                     return RedirectResponse(f"/exercise/{exercise_id}", status_code=303)
                 if not reply:
                     request.session["notice"] = "El tutor no ha devuelto una explicación. Prueba a preguntar de nuevo."
-            except StudyRequestBlocked as exc:
+            except (StudyRequestBlocked, accounting.BudgetExceeded) as exc:
                 finish_student_request(db, entry, "rechazada", str(exc))
                 request.session["notice"] = str(exc)
             except TutorContentError:
@@ -2038,7 +2111,7 @@ async def ask_profile_tutor(
                 db.rollback()
                 log_tutor_failure(exc)
                 finish_student_request(db, entry, "error")
-                request.session["notice"] = "No se pudo contactar con el tutor. Vuelve a intentarlo."
+                request.session["notice"] = failure_notice(exc, "No se pudo contactar con el tutor. Vuelve a intentarlo.")
     return RedirectResponse("/mis-tareas#student-tutor", status_code=303)
 
 @app.post("/tutor/conversacion")
@@ -2130,7 +2203,7 @@ async def tutor_conversation_turn(
                 if not reply:
                     finish_student_request(db, entry, "sin respuesta")
                     return message("El tutor no ha devuelto una explicación. Prueba a preguntar de nuevo.", 502)
-        except StudyRequestBlocked as exc:
+        except (StudyRequestBlocked, accounting.BudgetExceeded) as exc:
             reply, outcome = str(exc), "rechazada"
         except TutorContentError:
             reply, outcome = TUTOR_CONTENT_NOTICE, "sin verificar"
@@ -2177,6 +2250,7 @@ async def generated_voice(db: Session, profile: Profile, text: str, character: s
     headers = {"Cache-Control": "no-store", "X-Aula-Voice-Provider": voice.provider()}
     clip = db.get(VoiceClip, cache_key)
     if clip is not None:
+        accounting.cache_hit(voice.provider(), identity)
         return Response(clip.data, media_type="audio/wav", headers=headers)
     if not VOICE_SLOT.acquire(blocking=False):
         raise HTTPException(status_code=429, detail="La voz está ocupada. Inténtalo en un momento.")
@@ -2262,6 +2336,53 @@ def dashboard(request: Request, material: int | None = None, alumno: int | None 
     with db_session() as db:
         return render_adult_dashboard(request, db, open_material=material, open_profile=alumno)
 
+@app.get("/consumo")
+def consumption_page(request: Request, periodo: str = "mes", perfil: int = 0) -> Response:
+    redirect = login_redirect(request)
+    if redirect:
+        return redirect
+    if periodo not in {"mes", "hoy", "semana", "todo"}:
+        raise HTTPException(status_code=400, detail="Periodo no válido")
+    with db_session() as db:
+        profiles = db.scalars(select(Profile).order_by(Profile.name)).all()
+        if perfil and not any(p.id == perfil for p in profiles):
+            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+        data = accounting.report(periodo, perfil, [p.id for p in profiles])
+        by_id = {row["profile_id"]: row for row in data["rows"]}
+        today = datetime.now(learning.SCHOOL_TZ).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+        daily = dict(db.execute(select(StudentAudit.profile_id, func.count()).where(
+            StudentAudit.created_at >= today, StudentAudit.uses_quota.is_(True)).group_by(StudentAudit.profile_id)).all())
+        limits = dict(db.execute(select(StudentTutorPolicy.profile_id, StudentTutorPolicy.daily_limit)).all())
+        for p in profiles:
+            data["policies"].setdefault(p.id, {"limit": 0, "block": False})
+        data["policies"].setdefault(0, {"limit": 0, "block": False})
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+        key = hashlib.sha256(f"azure-voice-month:{month}".encode()).hexdigest()
+        azure_counter = db.get(SecurityThrottle, key)
+        azure_reserved = azure_counter.requests if azure_counter else 0
+        return render(request, "consumption.html", {
+            "profiles": profiles, "report": data, "by_id": by_id, "daily": daily, "daily_limits": limits,
+            "default_daily_limit": DEFAULT_DAILY_TUTOR_LIMIT, "azure_reserved": azure_reserved,
+            "notice": get_notice(request),
+        })
+
+
+@app.post("/consumo/limites")
+def consumption_limits(request: Request, scope_id: int = Form(..., ge=0),
+                       monthly_tokens: int = Form(..., ge=0, le=1_000_000_000),
+                       block: bool = Form(False), csrf_token: str = Form(...)) -> Response:
+    redirect = login_redirect(request)
+    if redirect:
+        return redirect
+    check_csrf(request, csrf_token)
+    with db_session() as db:
+        if scope_id and db.get(Profile, scope_id) is None:
+            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    accounting.save_budget(scope_id, monthly_tokens, block)
+    request.session["notice"] = "Presupuesto mensual guardado. Los límites de peticiones y voz siguen activos."
+    return RedirectResponse("/consumo", status_code=303)
+
+
 @app.get("/supervision")
 def supervision(request: Request, perfil: int = 0, vista: str = "apuntes", pagina: int = 1) -> Response:
     redirect = login_redirect(request)
@@ -2345,7 +2466,7 @@ async def review_reading(
             db.rollback()
             log_tutor_failure(exc)
             finish_student_request(db, entry, "error")
-            request.session["notice"] = "No se pudo consultar la lectura. Inténtalo más tarde."
+            request.session["notice"] = failure_notice(exc, "No se pudo consultar la lectura. Inténtalo más tarde.")
     return RedirectResponse(location, status_code=303)
 
 def render_adult_dashboard(
@@ -2360,11 +2481,8 @@ def render_adult_dashboard(
                            .order_by(StudyDocument.created_at.desc())).all()
     exercises = db.query(Exercise).order_by(Exercise.created_at.desc()).limit(12).all()
     packs = db.scalars(select(StudyPack).order_by(StudyPack.id.desc()).limit(30)).all()
-    month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    usage = db.query(func.count(AIUsage.id), func.coalesce(func.sum(AIUsage.input_tokens), 0),
-        func.coalesce(func.sum(AIUsage.output_tokens), 0), func.coalesce(func.sum(AIUsage.cost_usd), 0.0)
-    ).filter(AIUsage.created_at >= month).one()
     return render(request, "index.html", {
+        "consumption_summary": accounting.report("mes"),
         "voice_ready": voice.synthesis_ready(),
         "profiles": profiles, "documents": documents, "exercises": exercises, "packs": packs,
         "upload_accept": UPLOAD_ACCEPT, "photo_accept": PHOTO_ACCEPT, "max_material_files": MAX_MATERIAL_FILES,
@@ -2375,7 +2493,6 @@ def render_adult_dashboard(
         "exercise_draft": draft or {}, "exercise_error": error, "max_exercises": MAX_ADULT_EXERCISES,
         "open_material": open_material,
         "provider": os.getenv("AI_PROVIDER", "openai"),
-        "usage": {"calls": usage[0], "input": usage[1], "output": usage[2], "cost": usage[3]},
     }, status_code=status)
 
 @app.post("/profiles")
@@ -2624,7 +2741,7 @@ async def create_pack(
         except Exception as exc:
             db.rollback()
             log_tutor_failure(exc)
-            request.session["notice"] = "No se pudo preparar el pack. Revisa el texto y prueba de nuevo."
+            request.session["notice"] = failure_notice(exc, "No se pudo preparar el pack. Revisa el texto y prueba de nuevo.")
             return RedirectResponse("/", status_code=303)
 
 @app.get("/packs/{pack_id}")
@@ -2747,7 +2864,7 @@ async def adult_review(profile_id: int, exercise_id: int, request: Request, csrf
         except Exception as exc:
             db.rollback()
             log_tutor_failure(exc)
-            request.session["notice"] = "No se pudo asignar el repaso. Inténtalo más tarde."
+            request.session["notice"] = failure_notice(exc, "No se pudo asignar el repaso. Inténtalo más tarde.")
     return RedirectResponse(f"/profiles/{profile_id}/semana", status_code=303)
 
 @app.post("/exercises")
@@ -2892,7 +3009,8 @@ async def create_exercise(
         except Exception as exc:
             db.rollback()
             log_tutor_failure(exc)
-            return invalid("No se pudieron generar los ejercicios. Tus instrucciones siguen en el formulario.", status=502)
+            return invalid(failure_notice(exc, "No se pudieron generar los ejercicios. Tus instrucciones siguen en el formulario."),
+                           status=429 if isinstance(exc, accounting.BudgetExceeded) else 502)
 
 @app.get("/exercise/{exercise_id}", response_class=HTMLResponse)
 def exercise_page(exercise_id: int, request: Request, repaso: int | None = None) -> Response:
@@ -3054,7 +3172,7 @@ async def submit_answer(
             db.rollback()
             if entry is not None:
                 finish_student_request(db, entry, "error")
-            notice = "No se pudo corregir ahora. Inténtalo más tarde."
+            notice = failure_notice(exc, "No se pudo corregir ahora. Inténtalo más tarde.")
         request.session["notice"] = notice
     return RedirectResponse(location, status_code=303)
 
@@ -3145,7 +3263,7 @@ async def ask_tutor(
             else:
                 request.session["tutor_reply"] = {"exercise_id": exercise.id, "text": reply}
                 return RedirectResponse(f"{location}#tutor-respuesta", status_code=303)
-        except StudyRequestBlocked as exc:
+        except (StudyRequestBlocked, accounting.BudgetExceeded) as exc:
             finish_student_request(db, entry, "rechazada", str(exc))
             request.session["tutor_reply"] = {"exercise_id": exercise.id, "text": str(exc)}
             return RedirectResponse(f"{location}#tutor-respuesta", status_code=303)
@@ -3166,7 +3284,7 @@ async def ask_tutor(
             log_tutor_failure(exc)
             if entry is not None:
                 finish_student_request(db, entry, "error")
-            request.session["notice"] = "No se pudo contactar con el tutor. Vuelve a intentarlo."
+            request.session["notice"] = failure_notice(exc, "No se pudo contactar con el tutor. Vuelve a intentarlo.")
     return RedirectResponse(location, status_code=303)
 
 @app.exception_handler(HTTPException)

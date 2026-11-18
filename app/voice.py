@@ -11,7 +11,7 @@ from uuid import uuid4
 
 import httpx
 from websockets.asyncio.client import connect
-from . import azure_voice
+from . import accounting, azure_voice
 
 
 MODEL = "gpt-realtime-2.1-mini"
@@ -74,15 +74,23 @@ def voice_text(text: str) -> str:
 
 
 async def transcribe_class_audio(audio: bytes, extension: str, api_key: str) -> str:
-    async with httpx.AsyncClient(timeout=40) as client:
-        response = await client.post(
-            "https://api.openai.com/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            data={"model": "gpt-transcribe"},
-            files={"file": (f"nota{extension}", audio, CLASS_AUDIO_TYPES[extension])},
-        )
-        response.raise_for_status()
-    data = response.json()
+    event_id = accounting.begin("transcription", "openai", "gpt-transcribe", "transcribir")
+    try:
+        async with httpx.AsyncClient(timeout=40) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                data={"model": "gpt-transcribe"},
+                files={"file": (f"nota{extension}", audio, CLASS_AUDIO_TYPES[extension])},
+            )
+            response.raise_for_status()
+        data = response.json()
+        usage = data.get("usage") or {}
+        duration = usage.get("seconds", data.get("duration")) if isinstance(usage, dict) else data.get("duration")
+        accounting.finish(event_id, usage=usage, audio_seconds=duration)
+    except Exception:
+        accounting.fail(event_id)
+        raise
     return str(data.get("text") or "").strip()
 
 
@@ -99,6 +107,15 @@ async def synthesize(text: str, character: str, age_group: str, api_key: str) ->
         return await azure_voice.synthesize(text, character, age_group, api_key)
     if provider() != "openai":
         raise ValueError("Proveedor de voz no válido")
+    event_id = accounting.begin("openai_voice", "openai", MODEL, "sintetizar", text_characters=len(text))
+    try:
+        return await synthesize_openai(text, character, age_group, api_key, event_id)
+    except Exception:
+        accounting.fail(event_id)
+        raise
+
+
+async def synthesize_openai(text: str, character: str, age_group: str, api_key: str, event_id: str) -> bytes:
     voice, tone = VOICES[character]
     pace = {
         "early": "Usa un ritmo tranquilo y cercano, con pausas cortas entre ideas; mantén las palabras fluidas, sin separar sílabas ni adoptar voz de bebé.",
@@ -152,6 +169,7 @@ async def synthesize(text: str, character: str, age_group: str, api_key: str) ->
                         with wave.open(output, "wb") as wav:
                             wav.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
                             wav.writeframes(pcm)
+                        accounting.finish(event_id, usage=received["response"].get("usage"), audio_seconds=len(pcm) / 48000)
                         return output.getvalue()
     raise RuntimeError("El proveedor cerró la sesión de voz")
 
@@ -163,6 +181,7 @@ async def greeting(text: str, character: str, age_group: str, api_key: str, cach
     path = cache / f"{identity}-{character}-{age_group}.wav"
     async with greeting_lock:
         if path.is_file():
+            accounting.cache_hit(provider(), MODEL if provider() == "openai" else azure_voice.VOICES[character])
             return path.read_bytes()
         audio = await synthesize(text, character, age_group, api_key)
         temporary = cache / f"{uuid4().hex}.tmp"

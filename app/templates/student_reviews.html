@@ -1,0 +1,35 @@
+{% extends "student_study.html" %}
+{% block study_content %}
+<h1>Practicar y repasar</h1>
+<div class="student-review-grid">
+  <section class="card">
+    <h2>Práctica rápida</h2>
+    <p>Haz unos ejercicios de cálculo a tu ritmo.</p>
+    {% include "student_practice_action.html" %}
+  </section>
+  <section class="card">
+    <h2>Repasar mis errores</h2>
+    {% if has_mistakes %}
+    <p>Vuelve a practicar lo que te costó.</p>
+    <a class="button button-secondary" href="/mis-tareas/errores">Ver mis errores</a>
+    {% else %}
+    <p>Aquí podrás volver a practicar las tareas en las que te hayas equivocado.</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>Preparar un examen</h2>
+    <p>Elige la asignatura y las fechas de los apuntes que quieras repasar.</p>
+    <a class="button button-secondary" href="/mis-tareas/clase#notas">Elegir apuntes</a>
+  </section>
+</div>
+<section class="student-section" aria-labelledby="study-packs-heading">
+  <h2 id="study-packs-heading">Mis repasos guardados</h2>
+  {% if packs %}
+  <ul class="student-task-list">
+    {% for pack in packs %}<li><a class="student-task" href="/packs/{{ pack.id }}"><strong>{{ pack.title }}</strong><span class="student-task-action">Abrir <span aria-hidden="true">→</span></span></a></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p class="student-empty">Aquí aparecerán los repasos que prepares o te asignen.</p>
+  {% endif %}
+</section>
+{% endblock %}

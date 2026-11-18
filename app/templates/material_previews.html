@@ -1,0 +1,13 @@
+<ol class="material-previews">
+  {% for item in materials %}
+  <li>
+    {% set url = file_base ~ item.id %}
+    {% if item.is_photo %}
+    <a href="{{ url }}"><img src="{{ url }}" alt="Abrir {{ item.filename }}" loading="lazy"></a>
+    <small>{{ item.filename }}</small>
+    {% else %}
+    <a href="{{ url }}">{{ item.filename }}</a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ol>

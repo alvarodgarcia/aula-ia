@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block body_attributes %} class="access-page"{% endblock %}
+{% block content %}
+<div class="access-layout">
+  {% include "access_welcome.html" %}
+<section class="login-card card">
+  <span class="eyebrow">Acceso familiar</span><h1>Entrar en Aula IA</h1>
+  <p>Entra para acompañar el aprendizaje y preparar las próximas actividades.</p>
+  {% if error %}<div class="notice notice-error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Contraseña<input type="password" name="password" required autofocus autocomplete="current-password"></label>
+    <button class="button button-primary">Entrar como adulto</button>
+    <a class="button button-secondary" href="/login/alumno">Entrar como alumno</a>
+  </form>
+</section>
+</div>
+{% endblock %}

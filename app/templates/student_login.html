@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block page_styles %}<link rel="stylesheet" href="/static/student.css">{% endblock %}
+{% block body_attributes %} class="student student--login access-page"{% endblock %}
+{% block content %}
+<div class="access-layout">
+  {% include "access_welcome.html" %}
+<section class="login-card card">
+  <span class="eyebrow">Tu espacio para aprender</span>
+  <h1>Entrar como alumno</h1>
+  {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+  <p>Escribe el código que te ha dado el adulto y tu PIN.</p>
+  <form method="post" action="/login/alumno" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Código de alumno
+      <input name="login_code" maxlength="32" autocomplete="username" autocapitalize="characters" spellcheck="false" required>
+    </label>
+    <label>Tu PIN de 6 números
+      <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required>
+    </label>
+    <button class="button button-primary">Ver mis tareas</button>
+    <a class="button button-secondary" href="/login">Entrar como adulto</a>
+  </form>
+</section>
+</div>
+{% endblock %}

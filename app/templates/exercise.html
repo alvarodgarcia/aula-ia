@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block page_styles %}
+{% if age_group %}
+<link rel="stylesheet" href="/static/student.css?v=10">
+<script defer src="/static/tutor-voice.js?v=7"></script>
+<script defer src="/static/tutor-conversation.js?v=2"></script>
+{% if math_board %}<script defer src="/static/math-board.js"></script>{% endif %}
+{% endif %}
+{% if choices %}<link rel="stylesheet" href="/static/learning-visuals.css?v=2">{% endif %}
+{% endblock %}
+{% block body_attributes %}{% if age_group %} class="student student--{{ age_group }}"{% endif %}{% endblock %}
+{% block content %}
+{% set review_query = "?repaso=" ~ review_pack.id if review_pack else "" %}
+{% if review_pack %}
+<a class="back-link" href="/packs/{{ review_pack.id }}">← {{ "Repaso para examen" if review_kind == "class_review" else "Grupo de ejercicios" }}</a>
+{% elif not age_group %}
+<a class="back-link" href="/">← Volver al panel</a>
+{% endif %}
+<section class="exercise-layout">
+  <article class="card exercise-card">
+    {% if age_group %}
+    <p class="student-subject">{{ exercise.subject }}</p>
+    <h1>{{ exercise.topic }}</h1>
+    {% else %}
+    <div class="exercise-meta"><span class="tag">{{ exercise.subject }}</span><span class="tag">{{ exercise.topic }}</span><span class="tag">{{ exercise.difficulty }}</span></div>
+    <span class="eyebrow">{{ profile.name }} · {{ profile.course }} · {{ profile.stage }}</span>
+    <h1>Resuelve el ejercicio</h1>
+    {% endif %}
+    {% if exercise.exercise_mode == "tutor" %}<p class="student-subject">Creado por el tutor</p>{% endif %}
+    <div class="prompt" id="exercise-prompt">{{ exercise.prompt }}</div>
+    {% if math_board %}{% include "math_board.html" %}{% endif %}
+    {% if exercise.source_reference %}<p class="source-ref">Material de referencia: {{ exercise.source_reference }}</p>{% endif %}
+    {% if exercise.solved %}<div class="success-box">{{ "¡Completado! Lo conseguiste." if age_group == "early" else "¡Completado! Has resuelto el ejercicio." }}</div>{% endif %}
+    {% if review_pack and exercise.solved %}
+    {% if next_review %}<a class="button button-secondary" href="/exercise/{{ next_review }}{{ review_query }}">{{ "Siguiente ejercicio del repaso" if review_kind == "class_review" else "Siguiente ejercicio" }}</a>
+    {% else %}<a class="button button-secondary" href="/packs/{{ review_pack.id }}">{{ "Ver mi repaso" if review_kind == "class_review" else "Ver grupo de ejercicios" }}</a>{% endif %}
+    {% endif %}
+    {% if practice %}<a class="button button-secondary" href="/mis-tareas/practica/{{ practice.id }}">{{ "Siguiente de la sesión" if exercise.solved else "Volver a la sesión" }}</a>{% endif %}
+    {% if show_solution %}<div class="solution-box"><strong>{{ "Así se resuelve" if age_group == "early" else "Explicación" }}</strong><p>{{ exercise.worked_solution }}</p></div>{% endif %}
+    {% if not (age_group and exercise.solved) %}
+    <form method="post" action="/exercise/{{ exercise.id }}/answer{{ review_query }}" class="stack answer-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if choices %}
+      <fieldset class="answer-options">
+        <legend>Elige una opción</legend>
+        {% for option in choices %}
+        <label><input type="radio" name="answer" value="{{ option }}" required><span>{{ option }}</span></label>
+        {% endfor %}
+      </fieldset>
+      {% elif exercise.exercise_mode in ("practice", "review") %}
+      <label>Tu respuesta<input name="answer" inputmode="numeric" required placeholder="Escribe el resultado"></label>
+      {% else %}
+      <label>Tu respuesta<textarea name="answer" rows="4" required placeholder="{{ 'Escribe lo que has pensado' if age_group == 'early' else 'Escribe el resultado y, cuando proceda, los pasos que has seguido.' }}"></textarea></label>
+      {% endif %}
+      <button class="button button-primary" {% if exercise.solved %}disabled{% endif %}>Comprobar respuesta</button>
+      {% if age_group %}<a class="button button-secondary" href="#student-tutor" data-open-student-tutor>Pedir ayuda al tutor</a>{% endif %}
+    </form>
+    {% if not age_group %}
+    <div class="inline-actions"><form method="post" action="/exercise/{{ exercise.id }}/hint{{ review_query }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-secondary">Dame una pista</button></form></div>
+    {% endif %}
+    {% endif %}
+    {% if age_group %}
+    {% if exercise.attempts_count and not exercise.solved %}
+    <p class="attempt-counter">{{ exercise.attempts_count }} {{ "intento" if exercise.attempts_count == 1 else "intentos" }}</p>
+    {% endif %}
+    {% else %}
+    <div class="attempt-counter">Intentos: <strong>{{ exercise.attempts_count }}</strong>{% if exercise.attempts_count < 10 %} · Tras 10 intentos aparecerá una explicación.{% elif not exercise.solved %} · Ya tienes una explicación breve; puedes volver a intentarlo.{% endif %}</div>
+    {% endif %}
+  </article>
+  {% if age_group %}
+  {% include "student_tutor.html" %}
+  {% else %}
+  <aside class="card tutor-card">
+    <span class="eyebrow">Profesor particular IA</span>
+    <h2>¿Qué duda tienes?</h2>
+    <p>Pide una explicación, una pista o que revise tu razonamiento.</p>
+    <form method="post" action="/exercise/{{ exercise.id }}/tutor{{ review_query }}" class="stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Pregunta<textarea name="question" rows="5" required placeholder="No entiendo qué operación tengo que hacer..."></textarea></label>
+      <button class="button button-dark">Preguntar al tutor</button>
+    </form>
+  </aside>
+  {% endif %}
+</section>
+{% if attempts or not age_group %}
+<section class="card section-block"><div class="section-heading"><div>{% if not age_group %}<span class="eyebrow">Historial</span>{% endif %}<h2>{{ "Mis intentos" if age_group == "early" else "Intentos recientes" }}</h2></div></div>
+  {% if attempts %}<ol class="attempt-list">{% for a in attempts %}<li><span class="status-dot {% if a.correct %}done{% endif %}"></span><div><strong>{% if a.correct %}Correcto{% else %}Revisar{% endif %}</strong><p>{{ a.feedback }}</p><small>{{ a.created_at.strftime("%d/%m/%Y %H:%M") }}</small></div></li>{% endfor %}</ol>{% else %}<p class="empty">Todavía no hay intentos. ¡Tú puedes!</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

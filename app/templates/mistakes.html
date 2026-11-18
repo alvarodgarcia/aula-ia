@@ -1,0 +1,21 @@
+{% extends "student_study.html" %}
+{% block study_content %}
+<section class="card">
+  <h1>Repasar mis errores</h1>
+  {% if mistakes %}
+  <ul class="study-list">
+    {% for exercise, attempt in mistakes %}
+    <li>
+      <strong>{{ exercise.subject }} · {{ exercise.topic }}</strong>
+      <p>{{ attempt.feedback }}</p>
+      <form method="post" action="/mis-tareas/errores/{{ exercise.id }}/repasar" class="study-actions">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <a class="button button-secondary" href="/exercise/{{ exercise.id }}">Ver ejercicio</a>
+        <button class="button button-primary">Probar otro parecido</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p>Tus ejercicios para repasar aparecerán aquí cuando tengas algún intento por revisar.</p>{% endif %}
+</section>
+{% endblock %}

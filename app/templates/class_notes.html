@@ -1,0 +1,134 @@
+{% extends "student_study.html" %}
+{% block page_styles %}
+{{ super() }}
+{% if upload_accept %}<link rel="stylesheet" href="/static/learning-visuals.css?v=7">{% endif %}
+{% if transcription_available %}<script defer src="/static/class-note.js"></script>{% endif %}
+{% endblock %}
+{% block study_content %}
+<header class="student-study-heading">
+  <h1>{{ "En clase" if age_group == "early" else "Mis apuntes" }}</h1>
+  <nav class="study-actions" aria-label="Opciones de apuntes">
+    <a class="button button-secondary" href="#escribir-apunte">{{ "Escribir o dictar" if transcription_available else "Escribir una nota" }}</a>
+    {% if upload_accept %}<a class="button button-secondary" href="#subir-material">Añadir fotos o PDF</a>{% endif %}
+    {% if subjects %}<a class="button button-secondary" href="#notas">Ver apuntes guardados</a>{% endif %}
+  </nav>
+</header>
+{% if upload_accept %}
+<section class="card" id="subir-material">
+  <h2>Añadir foto o PDF</h2>
+  <p>Reúne las fotos y PDF de un tema y revisa el texto extraído. El adulto puede consultar las subidas.</p>
+  <form method="post" action="/mis-tareas/clase/material" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <label>Asignatura<input name="subject" maxlength="80" placeholder="Matemáticas" required></label>
+      <label>Tema<input name="topic" maxlength="160" placeholder="Derivadas" required></label>
+      <label>Fecha de clase<input name="day" type="date" value="{{ today }}" max="{{ today }}" required></label>
+      {% include "material_inputs.html" %}
+    </div>
+    <div class="study-actions"><button class="button button-primary">Leer material</button></div>
+  </form>
+</section>
+{% endif %}
+{% if drafts %}
+<section class="card section-block">
+  <h2>Material por revisar</h2>
+  <ul class="study-list">
+    {% for note in drafts %}
+    <li><a href="/mis-tareas/clase/material/{{ note.id }}">{{ note.subject }} · {{ note.topic }}</a>
+      <p>{{ note.attachment.filename }}{% if note.attachment.moderation == "blocked" %} · Retirado por el adulto{% endif %}</p></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+<section class="card section-block" id="escribir-apunte">
+  <h2>Hoy en clase</h2>
+  <form method="post" action="/mis-tareas/clase" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>¿Qué recuerdas de la clase?
+      <textarea name="notes" rows="3" maxlength="1200" required placeholder="Hoy en mates hemos…">{{ draft.notes if draft else '' }}</textarea>
+    </label>
+    {% if transcription_available %}
+    <div class="note-dictation" data-class-dictation hidden>
+      <div class="study-actions">
+        <button type="button" class="button button-secondary" data-record-note hidden>Dictar nota</button>
+        <button type="button" class="button button-secondary" data-upload-note>Adjuntar grabación</button>
+        <input type="file" accept="audio/*,.webm,.mp4,.m4a,.wav,.ogg,.mp3,.flac,.mpeg" data-note-audio hidden>
+      </div>
+      <small>OpenAI convierte el audio en texto. Revisa la nota antes de guardarla.</small>
+      <p data-dictation-status role="status"></p>
+    </div>
+    {% endif %}
+    {% if guidance %}<p class="notice" role="status">{{ guidance }}</p>{% endif %}
+    <div class="form-grid form-grid-two">
+      <label>Asignatura<input name="subject" maxlength="80" value="{{ draft.subject if draft else '' }}"></label>
+      <label>Tema<input name="topic" maxlength="160" value="{{ draft.topic if draft else '' }}"></label>
+    </div>
+    <div class="study-actions">
+      <button class="button button-secondary" name="intent" value="suggest">Pedir ayuda al tutor</button>
+      <button class="button button-primary" name="intent" value="save">Guardar nota</button>
+    </div>
+  </form>
+</section>
+<section class="card section-block" id="notas">
+  <h2>Mis notas de clase</h2>
+  {% if subjects %}
+  <form method="get" action="/mis-tareas/clase#notas" class="form-grid class-filters">
+    <label>Asignatura
+      <select name="asignatura">
+        <option value="">Todas las asignaturas</option>
+        {% for subject in subjects %}
+        <option value="{{ subject }}"{% if subject|lower == filters.asignatura|lower %} selected{% endif %}>{{ subject }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Desde<input type="date" name="desde" value="{{ filters.desde }}"></label>
+    <label>Hasta<input type="date" name="hasta" value="{{ filters.hasta }}"></label>
+    <div class="form-actions study-actions">
+      <button class="button button-secondary">Filtrar notas</button>
+      <button class="button button-secondary" name="periodo" value="semana">Últimos 7 días</button>
+      <button class="button button-secondary" name="periodo" value="mes">Este mes</button>
+      {% if filters.asignatura or filters.desde or filters.hasta %}<a href="/mis-tareas/clase#notas">Quitar filtros</a>{% endif %}
+    </div>
+  </form>
+  {% if notes %}
+  <form method="post" action="/mis-tareas/clase/repaso" class="class-review-actions">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="asignatura" value="{{ filters.asignatura }}">
+    <input type="hidden" name="desde" value="{{ filters.desde }}">
+    <input type="hidden" name="hasta" value="{{ filters.hasta }}">
+    <p>{{ total }} {{ "nota en esta selección" if total == 1 else "notas en esta selección" }}</p>
+    <div class="study-actions">
+      <button class="button button-secondary" name="intent" value="ask">Preguntar sobre estas clases</button>
+      <button class="button button-primary" name="intent" value="exam">Preparar repaso de examen</button>
+    </div>
+  </form>
+  <ul class="study-list">
+    {% for note in notes %}
+    <li>
+      <strong>{{ note.subject }} · {{ note.topic }}</strong>
+      <small>{{ note.day[8:10] }}/{{ note.day[5:7] }}/{{ note.day[:4] }}</small>
+      {% if note.attachment %}
+      <p><a href="/mis-tareas/clase/material/{{ note.id }}">Ver o editar apunte</a></p>
+      {% else %}
+      <p>{{ note.notes }}</p>
+      {% endif %}
+      <form method="post" action="/mis-tareas/tutor" class="study-actions">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="note_id" value="{{ note.id }}">
+        <input type="hidden" name="question" value="Quiero repasar esta nota de clase.">
+        <button class="button button-secondary" name="intent" value="explain">Explícamelo</button>
+        <button class="button button-primary" name="intent" value="exercise">Practicar este tema</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if previous or following %}
+  <nav class="study-actions" aria-label="Páginas de notas">
+    {% if previous %}<a class="button button-secondary" href="{{ previous }}">← Página anterior</a>{% endif %}
+    {% if following %}<a class="button button-secondary" href="{{ following }}">Ver notas más antiguas →</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% else %}<p>No hay notas en esa selección.</p>{% endif %}
+  {% else %}<p>Todavía no tienes notas guardadas.</p>{% endif %}
+</section>
+{% endblock %}

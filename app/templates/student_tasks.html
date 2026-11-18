@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block page_styles %}
+<link rel="stylesheet" href="/static/student.css?v=10">
+<script defer src="/static/tutor-voice.js?v=7"></script>
+<script defer src="/static/tutor-conversation.js?v=2"></script>
+{% endblock %}
+{% block body_attributes %} class="student student--{{ age_group }}"{% endblock %}
+{% macro task_list(tasks, empty, show_status=false) %}
+  {% if tasks %}
+  <ul class="student-task-list">
+    {% for task in tasks %}
+    {% set solved = task.solved %}
+    <li>
+      <a class="student-task{% if solved %} student-task--done{% endif %}" href="/exercise/{{ task.id }}">
+        <div>
+          <span class="student-subject">{{ task.subject }}</span>
+          <h3>{{ task.topic }}</h3>
+          {% if task.exercise_mode in ("practice", "review") %}<span class="student-task-status">{{ task.prompt }}</span>{% endif %}
+          {% if task.exercise_mode == "tutor" %}
+          <span class="student-task-status">Creado por el tutor{% if show_status %} · {{ "Completado" if solved else "Pendiente" }}{% endif %}</span>
+          {% if task.source_reference %}<span class="student-task-status">{{ task.source_reference }}</span>{% endif %}
+          {% endif %}
+          {% if not show_status and not solved and task.attempts_count %}
+          <span class="student-task-status">{{ "Empezada" if age_group == "early" else "En curso" }}</span>
+          {% endif %}
+        </div>
+        <span class="student-task-action">
+          {% if solved %}{{ "Ver" if age_group == "early" else "Revisar" }}
+          {% elif task.attempts_count %}Continuar
+          {% else %}{{ "Empezar" if age_group != "teen" else "Abrir tarea" }}
+          {% endif %}
+          <span aria-hidden="true">→</span>
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="student-empty">{{ empty }}</p>
+  {% endif %}
+{% endmacro %}
+{% block content %}
+{% set total = pending|length + completed_tasks %}
+<section class="student-heading" aria-labelledby="student-title">
+  <div>
+    <p class="student-greeting">Hola, {{ profile.name }}</p>
+    <h1 id="student-title">Mis tareas</h1>
+    <p class="student-course">{{ profile.course }} · {{ profile.stage }}</p>
+  </div>
+  {% if total %}
+  <div class="student-progress">
+    <label for="student-progress">{{ completed_tasks }} de {{ total }} {{ "tareas hechas" if age_group == "early" else "tareas completadas" }}</label>
+    <progress id="student-progress" value="{{ completed_tasks }}" max="{{ total }}"></progress>
+  </div>
+  {% endif %}
+</section>
+{% if pending or active_practice %}
+<div class="study-actions student-home-actions">
+  {% if pending %}
+  <a class="button button-secondary" href="#tareas-pendientes">{{ "Ver mi tarea" if pending|length == 1 else "Ver mis tareas pendientes" }}</a>
+  {% endif %}
+  {% if active_practice %}{% include "student_practice_action.html" %}{% endif %}
+</div>
+{% endif %}
+<div class="student-dashboard">
+{% include "student_tutor.html" %}
+<div class="student-dashboard-tasks">
+<section class="student-section" id="tareas-pendientes" aria-labelledby="pending-heading">
+  <h2 id="pending-heading">{{ "Por hacer" if age_group == "early" else "Pendientes" }}</h2>
+  {% if pending %}
+  {% set next_task = pending[0] %}
+  <a class="student-task student-task-featured" href="/exercise/{{ next_task.id }}">
+    <div>
+      <span class="student-subject">{{ next_task.subject }}</span>
+      <h3>{{ next_task.topic }}</h3>
+      {% if next_task.exercise_mode == "review" %}<span class="student-task-status">{{ next_task.prompt }}</span>{% endif %}
+      {% if next_task.exercise_mode == "tutor" %}<span class="student-task-status">Creado por el tutor</span>{% endif %}
+    </div>
+    <span class="student-task-action">{{ "Continuar" if next_task.attempts_count else ("Abrir tarea" if age_group == "teen" else "Empezar") }} <span aria-hidden="true">→</span></span>
+  </a>
+  {% if pending|length > 1 %}{{ task_list(pending[1:], "") }}{% endif %}
+  {% else %}
+  <p class="student-empty">{{ "¡Has terminado todas tus tareas!" if completed_tasks else "Aún no tienes tareas pendientes." }}</p>
+  {% endif %}
+</section>
+{% if packs %}
+<section class="student-section" aria-labelledby="study-packs-heading">
+  <h2 id="study-packs-heading">Repasos recientes</h2>
+  <ul class="student-task-list">
+    {% for pack in packs %}<li><a class="student-task" href="/packs/{{ pack.id }}"><strong>{{ pack.title }}</strong><span class="student-task-action">Abrir <span aria-hidden="true">→</span></span></a></li>{% endfor %}
+  </ul>
+  <a class="button button-secondary student-section-link" href="/mis-tareas/repasos">Ver todos mis repasos</a>
+</section>
+{% endif %}
+{% if completed or tutor_count %}
+<details class="student-section student-exercise-history" id="historial"{% if history_open %} open{% endif %}>
+  <summary>Historial</summary>
+  <nav class="study-actions history-filters" aria-label="Filtrar historial">
+    <a class="button {{ 'button-primary' if not history_is_tutor else 'button-secondary' }}"
+       href="/mis-tareas?historial=completadas#historial"{% if not history_is_tutor %} aria-current="true"{% endif %}>Completadas ({{ completed|length }})</a>
+    {% if tutor_count %}
+    <a class="button {{ 'button-primary' if history_is_tutor else 'button-secondary' }}"
+       href="/mis-tareas?historial=tutor#historial"{% if history_is_tutor %} aria-current="true"{% endif %}>Creadas por el tutor ({{ tutor_count }})</a>
+    {% endif %}
+  </nav>
+  {{ task_list(history, "Aquí verás las tareas que completes.", history_is_tutor) }}
+</details>
+{% endif %}
+</div>
+</div>
+{% endblock %}

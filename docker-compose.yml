@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: aulaia
+      POSTGRES_USER: aulaia
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aulaia -d aulaia"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: 1536m
+    cpus: 2.0
+    pids_limit: 128
+    networks: [internal]
+volumes:
+  postgres_data:
+networks:
+  internal:
+    driver: bridge

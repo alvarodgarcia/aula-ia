@@ -1,0 +1,21 @@
+{% extends "student_study.html" %}
+{% block study_content %}
+<section class="card">
+  <h1>Practicar 5 minutos</h1>
+  {% set completed = items|selectattr("solved")|list|length %}
+  {% set next_item = items|rejectattr("solved")|first %}
+  <p>{{ completed }} de 3 ejercicios completados</p>
+  <progress value="{{ completed }}" max="3" aria-label="Ejercicios completados"></progress>
+  <ol class="study-list">
+    {% for item in items %}
+    <li>
+      <strong>{{ "Repaso" if loop.index == 1 else ("Práctica" if loop.index == 2 else ("Reto" if item.difficulty == "reto" else "Para terminar")) }} · {{ item.topic }}</strong>
+      {% if item.solved %}<a class="button button-secondary" href="/exercise/{{ item.id }}">Ver ejercicio</a>
+      {% elif item == next_item %}<a class="button button-primary" href="/exercise/{{ item.id }}">Resolver</a>
+      {% else %}<small>Después del ejercicio anterior</small>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if completed == 3 %}<p class="success-box">¡Sesión terminada! Puedes volver a Mis tareas.</p>{% endif %}
+</section>
+{% endblock %}

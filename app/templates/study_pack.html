@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block page_styles %}
+{% if age_group %}<link rel="stylesheet" href="/static/student.css?v=10">{% endif %}
+<link rel="stylesheet" href="/static/learning-visuals.css">
+{% endblock %}
+{% block body_attributes %}{% if age_group %} class="student student--{{ age_group }}"{% endif %}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ '/' if adult else '/mis-tareas' }}">← {{ "Panel de adulto" if adult else "Mis tareas" }}</a>
+<section class="card">
+  <h1>{{ pack.title }}</h1>
+  {% if adult and not pack.assigned %}<p><strong>Borrador pendiente de revisar</strong></p>{% endif %}
+  {% if content.kind == "class_review" %}
+  <p>{{ content.period }} · {{ content.note_count }} {{ "nota de clase" if content.note_count == 1 else "notas de clase" }}</p>
+  {% elif content.kind == "adult_batch" %}
+  <p>{{ content.subject }}{% if document %} · {{ document.filename }}{% endif %}</p>
+  {% else %}
+  <p>{% if document %}{{ document.filename }} · {% endif %}{% if content.source_type == "photo" %}Foto{% else %}Páginas {{ content.first }}–{{ content.last }}{% endif %}</p>
+  {% endif %}
+  {% if content.kind in ("class_review", "adult_batch") %}
+  <label for="pack-progress">{{ pack_done|length }} de {{ content.exercise_ids|length }} ejercicios completados</label>
+  <progress id="pack-progress" max="{{ content.exercise_ids|length }}" value="{{ pack_done|length }}"></progress>
+  {% endif %}
+  {% if content.summary %}
+  <h2>Resumen</h2>
+  <p style="white-space: pre-wrap">{{ content.summary }}</p>
+  {% endif %}
+</section>
+{% if source_pages %}
+<details class="card section-block">
+  <summary>{% if content.source_type == "bundle" %}Comparar con el texto del paquete{% elif content.source_type == "photo" %}Comparar con el texto de la foto{% else %}Comparar con el texto del PDF{% endif %}</summary>
+  {% for number, excerpt in source_pages.items() %}
+  <h3>{{ "Texto de la foto" if content.source_type == "photo" else "Página " ~ number }}</h3><p style="white-space: pre-wrap">{{ excerpt }}</p>
+  {% endfor %}
+</details>
+{% endif %}
+{% if content.cards %}
+<section class="card section-block">
+  <h2>Fichas de memoria</h2>
+  <div class="flashcard-grid">
+  {% for card in content.cards %}
+  <details class="recall-card">
+    <summary><strong>{{ card.front }}</strong><span class="recall-source">{{ "Foto" if content.source_type == "photo" else "Página " ~ card.page }}</span><span class="recall-action" aria-hidden="true"></span></summary>
+    <p class="recall-answer">{{ card.back }}</p>
+  </details>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+<section class="card section-block">
+  <h2>Ejercicios</h2>
+  <ol>
+    {% for item in content.exercises %}
+    <li>
+      <p><strong>{{ item.topic }}</strong>{% if content.kind in ("class_review", "adult_batch") %}{% if item.source_label %} · {{ item.source_label }}{% endif %}{% elif content.source_type == "photo" %} · Foto{% else %} · Página {{ item.page }}{% endif %}</p>
+      {% if pack.assigned %}
+      {% set exercise_id = content.exercise_ids[loop.index0] %}
+      <p><a href="/exercise/{{ exercise_id }}{% if content.kind in ('class_review', 'adult_batch') %}?repaso={{ pack.id }}{% endif %}">{{ "Revisar ejercicio" if exercise_id in pack_done else "Abrir ejercicio" }}</a></p>
+      {% endif %}
+      {% if adult and content.kind != "class_review" %}
+      <p style="white-space: pre-wrap">{{ item.prompt }}</p>
+      <details><summary>Revisar solución</summary><p>{{ item.worked_solution }}</p></details>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if adult and not pack.assigned %}
+  <form method="post" action="/packs/{{ pack.id }}/assign">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="button button-primary">Asignar pack al alumno</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

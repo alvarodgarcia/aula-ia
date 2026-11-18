@@ -1,0 +1,7 @@
+<form method="post" action="/supervision/{{ limit_profile.id }}/limite" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if from_dashboard %}<input type="hidden" name="from_dashboard" value="true">{% endif %}
+  <label>Solicitudes al día<input name="daily_limit" type="number" min="0" max="{{ max_daily_limit }}" value="{{ daily_limit }}" required></label>
+  <small>Usa 0 para pausar las solicitudes de IA de este perfil.</small>
+  <div><button class="button button-primary">Guardar límite</button></div>
+</form>

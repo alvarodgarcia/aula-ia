@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block page_styles %}<link rel="stylesheet" href="/static/learning-visuals.css?v=5">{% endblock %}
+{% block content %}
+<a class="back-link" href="/">← Panel de adulto</a>
+<section class="card">
+  <h1>Supervisión del alumnado</h1>
+  <nav class="admin-overview-nav" aria-label="Vistas de supervisión">
+    <a class="button {{ 'button-primary' if vista == 'apuntes' else 'button-secondary' }}" href="/supervision?perfil={{ profile.id if profile else 0 }}">Apuntes subidos</a>
+    <a class="button {{ 'button-primary' if vista == 'solicitudes' else 'button-secondary' }}" href="/supervision?vista=solicitudes&amp;perfil={{ profile.id if profile else 0 }}">Solicitudes y decisiones</a>
+  </nav>
+  <form method="get" action="/supervision" class="form-grid">
+    <input type="hidden" name="vista" value="{{ vista }}">
+    <label>Alumno
+      <select name="perfil">
+        <option value="0">Todos</option>
+        {% for p in profiles %}<option value="{{ p.id }}"{% if profile and p.id == profile.id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="inline-actions"><button class="button button-secondary">Filtrar</button></div>
+  </form>
+</section>
+{% if profile and vista == "solicitudes" %}
+<div class="two-column section-block">
+  <section class="card">
+    <h2>Límite diario de IA</h2>
+    {% with limit_profile=profile %}{% include "student_limit_form.html" %}{% endwith %}
+  </section>
+  <section class="card">
+    <h2>Consultar una lectura</h2>
+    <form method="post" action="/supervision/{{ profile.id }}/lectura" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Título y autor<input name="book" maxlength="300" required></label>
+      <small>El resultado queda en este registro para el adulto.</small>
+      <div><button class="button button-secondary">Solicitar resumen</button></div>
+    </form>
+  </section>
+</div>
+{% endif %}
+<section class="card section-block">
+  <h2>{{ "Apuntes subidos" if vista == "apuntes" else "Solicitudes y decisiones" }}</h2>
+  {% if rows %}
+  <div class="document-list">
+    {% if vista == "apuntes" %}
+      {% for attachment, note, name in rows %}
+      <a class="exercise-row" href="/mis-tareas/clase/material/{{ note.id }}">
+        <span class="exercise-row-main"><strong>{{ note.subject }} · {{ note.topic }}</strong>
+        <small>{{ name }} · {{ attachment.filename }} · {{ note.day }}</small></span>
+        <span class="tag">{% if attachment.moderation == "blocked" %}Retirado por el adulto{% elif attachment.moderation == "withdrawn" %}Retirado por el alumno{% elif attachment.moderation == "approved" %}Revisado por el adulto{% elif attachment.reviewed %}Guardado por el alumno{% else %}Sin revisar{% endif %}</span>
+      </a>
+      {% endfor %}
+    {% else %}
+      {% for entry, name in rows %}
+      <details class="document-item">
+        <summary><span><strong>{{ name }} · {{ entry.activity }}</strong>
+          <small>{{ entry.local_time }}</small></span><span class="tag">{{ entry.outcome }}</span></summary>
+        <p class="shared-note-text">{{ entry.detail }}</p>
+        {% if entry.reply %}<p class="shared-note-text">{{ entry.reply }}</p>{% endif %}
+      </details>
+      {% endfor %}
+    {% endif %}
+  </div>
+  {% else %}<p class="empty">Todavía no hay registros en esta vista.</p>{% endif %}
+  {% if pagina > 1 or more %}
+  <nav class="admin-overview-nav inline-actions" aria-label="Páginas de supervisión">
+    {% if pagina > 1 %}<a class="button button-secondary" href="/supervision?vista={{ vista }}&amp;perfil={{ profile.id if profile else 0 }}&amp;pagina={{ pagina - 1 }}">← Anterior</a>{% endif %}
+    {% if more %}<a class="button button-secondary" href="/supervision?vista={{ vista }}&amp;perfil={{ profile.id if profile else 0 }}&amp;pagina={{ pagina + 1 }}">Siguiente →</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

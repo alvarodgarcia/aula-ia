@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block page_styles %}<link rel="stylesheet" href="/static/learning-visuals.css?v=7">{% endblock %}
+{% block content %}
+<section class="hero admin-hero">
+  <div><span class="eyebrow">Acompañar su aprendizaje</span><h1>Panel de adulto</h1><p>Prepara actividades, organiza sus materiales y sigue su progreso.</p></div>
+  <div class="hero-counts"><a href="#acceso-alumnos"><strong>{{ profiles|length }}</strong><span>Alumnos</span></a><a href="#biblioteca"><strong>{{ documents|length }}</strong><span>Materiales</span></a></div>
+</section>
+<nav class="admin-overview-nav" aria-label="Accesos del panel">
+  <a class="button button-secondary" href="#acceso-alumnos">Alumnos ({{ profiles|length }})</a>
+  <a class="button button-secondary" href="#crear-ejercicio">Crear ejercicios</a>
+  <a class="button button-secondary" href="#biblioteca">Biblioteca ({{ documents|length }})</a>
+  <a class="button button-secondary" href="#anadir-pdf">Añadir PDF o foto</a>
+  <a class="button button-secondary" href="/supervision">Supervisión del alumnado</a>
+  <a class="button button-secondary" href="/ayuda">Cómo usar Aula IA</a>
+</nav>
+<div class="two-column">
+  <section class="card"><div class="section-heading"><h2>Crear perfil</h2></div>
+    <form method="post" action="/profiles" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Nombre o alias<input name="name" maxlength="80" placeholder="Ej. Alumno 1" required></label>
+      <label>Edad<input type="number" name="age" min="3" max="20" required></label>
+      <label>Etapa<select id="profile-stage" name="stage" required>{% for stage in education.keys() %}<option>{{ stage }}</option>{% endfor %}</select></label>
+      <label>Ciclo<select id="profile-cycle" name="cycle" required></select></label>
+      <label>Curso<select id="profile-course" name="course" required></select></label>
+      <div class="form-actions"><button class="button button-primary">Crear perfil</button></div>
+    </form>
+  </section>
+  <section class="card" id="crear-ejercicio"><div class="section-heading"><h2>Crear ejercicios con IA</h2></div>
+    {% if profiles %}
+    {% if exercise_error %}<p class="notice notice-error" role="alert">{{ exercise_error }}</p>{% endif %}
+    <form method="post" action="/exercises" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Alumno<select name="profile_id" required>{% for p in profiles %}<option value="{{ p.id }}"{% if p.id == exercise_draft.profile_id %} selected{% endif %}>{{ p.name }} · {{ p.course }} {{ p.stage }}</option>{% endfor %}</select></label>
+      <label>Materia<input name="subject" maxlength="80" placeholder="Matemáticas" value="{{ exercise_draft.subject }}" required></label>
+      <label>Instrucciones para la IA
+        <textarea name="instructions" rows="4" maxlength="3000" required placeholder="Quiero que se generen 5 ejercicios de fracciones, de menor a mayor dificultad. Que dos tengan tres opciones de respuesta.">{{ exercise_draft.instructions }}</textarea>
+        <small>Indica qué practicar, cuántos ejercicios quieres y cómo deben ser.</small>
+      </label>
+      <details class="exercise-generation-options"{% if exercise_error %} open{% endif %}>
+        <summary>Opciones de generación</summary>
+        <div class="form-grid">
+          <label>Modo<select name="mode"><option value="practicar">Crear ejercicios nuevos</option><option value="replicar"{% if exercise_draft.mode == "replicar" %} selected{% endif %}>Replicar tarea del colegio</option></select></label>
+          <label>Cantidad (opcional)<input type="number" name="quantity" min="1" max="{{ max_exercises }}" value="{{ exercise_draft.quantity }}" placeholder="Según las instrucciones"></label>
+          <label>Material de referencia<select name="document_id"><option value="">Sin material</option>{% for d in documents %}<option value="{{ d.id }}"{% if d.id|string == exercise_draft.document_id %} selected{% endif %}>{{ d.profile.name }} · {{ d.filename }} · {{ d.subject or "Sin asignatura" }}</option>{% endfor %}</select></label>
+          <label>Dificultad<select name="difficulty"><option value="auto">Según las instrucciones</option>{% for level in ("adecuada", "refuerzo", "reto") %}<option{% if level == exercise_draft.difficulty %} selected{% endif %}>{{ level }}</option>{% endfor %}</select></label>
+        </div>
+      </details>
+      <button class="button button-primary">Generar ejercicios</button>
+    </form>
+    {% else %}<p class="empty">Crea primero un perfil para preparar ejercicios.</p>{% endif %}
+  </section>
+</div>
+<section class="card section-block" id="acceso-alumnos">
+  <div class="section-heading"><h2>Perfiles de alumnos</h2></div>
+  {% if profiles %}
+  <div class="document-list">
+    {% for p in profiles %}
+    {% set limit = daily_limits.get(p.id, default_daily_limit) %}
+    <details class="document-item" id="alumno-{{ p.id }}"{% if open_profile == p.id %} open{% endif %}>
+      <summary>
+        <span><strong>{{ p.name }}</strong><small>{{ p.course }} · {{ p.stage }}</small><small>{{ ("IA pausada" if limit == 0 else limit ~ " solicitudes de IA al día") }}</small></span>
+        <span class="tag">Configurar</span>
+      </summary>
+      {% if login_codes.get(p.id) %}
+      <p>Código de alumno <strong>{{ login_codes[p.id] }}</strong></p>
+      <p>Comparte este código y el PIN con {{ p.name }} para que pueda entrar.</p>
+      {% endif %}
+      <form method="post" action="/profiles/{{ p.id }}/pin" class="stack review-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>PIN de seis cifras
+          <input type="password" name="pin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required>
+        </label>
+        <div class="inline-actions"><button class="button button-secondary">{{ "Restablecer PIN" if p.id in student_profile_ids else "Guardar PIN" }}</button></div>
+      </form>
+      <h3>Límite diario de IA</h3>
+      {% with limit_profile=p, daily_limit=limit, from_dashboard=true %}{% include "student_limit_form.html" %}{% endwith %}
+      <p><a href="/profiles/{{ p.id }}/semana">Ver resumen semanal</a></p>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}<p class="empty">Crea un perfil para configurar su PIN.</p>{% endif %}
+</section>
+<section class="card section-block" id="anadir-pdf"><div class="section-heading"><div><h2>Añadir PDF o foto</h2><p>Revisa el texto extraído antes de generar ejercicios.</p></div></div>
+  {% if profiles %}
+  <form method="post" action="/documents" enctype="multipart/form-data" class="upload-grid material-upload-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Alumno<select name="profile_id" required>{% for p in profiles %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>
+    <label>Asignatura<input name="subject" placeholder="Ciencias"></label><label>Tema<input name="topic" placeholder="La energía"></label>
+    {% include "material_inputs.html" %}
+    <div class="form-actions"><button class="button button-secondary">Leer y guardar</button></div>
+  </form>{% else %}<p class="empty">Crea primero un perfil para asignarle una tarea.</p>{% endif %}
+</section>
+<section class="card section-block" id="biblioteca"><div class="section-heading"><h2>Biblioteca</h2></div>
+  {% if documents %}<div class="document-list">{% for d in documents %}
+  <details class="document-item" id="material-{{ d.id }}"{% if open_material == d.id %} open{% endif %}><summary><span><strong>{{ d.filename }}</strong><small>{{ "Paquete" if d.is_bundle else "Foto" if d.is_photo else "PDF" }} · {{ d.profile.name }} · {{ d.subject or "Sin asignatura" }} · {{ d.topic or "Sin tema" }}</small></span><span class="tag">Revisar lectura</span></summary>
+    <div{% if d.is_photo or d.is_bundle %} class="material-review"{% endif %}>
+      {% if d.is_photo %}<figure><img src="/documents/{{ d.id }}/foto" alt="Foto subida para revisar el texto" loading="lazy"></figure>{% endif %}
+      {% if d.is_bundle %}{% with materials=d.files, file_base='/documents/' ~ d.id ~ '/archivo/' %}{% include "material_previews.html" %}{% endwith %}{% endif %}
+      {% if not d.is_photo and not d.is_bundle %}<p><a href="/documents/{{ d.id }}/archivo">Descargar PDF original</a></p>{% endif %}
+      <form method="post" action="/documents/{{ d.id }}/review" class="stack review-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% if d.is_photo and not d.extracted_text.strip() %}<p>El OCR no encontró texto. Puedes escribirlo aquí.</p>{% endif %}
+        <label>Texto extraído<textarea name="extracted_text" rows="10">{{ d.extracted_text }}</textarea></label>
+        <div class="inline-actions"><button class="button button-secondary">Guardar texto revisado</button></div>
+      </form>
+    </div>
+    <form method="post" action="/documents/{{ d.id }}/pack" class="form-grid review-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if d.is_photo %}
+      <input name="first" type="hidden" value="1"><input name="last" type="hidden" value="1">
+      {% else %}
+      <label>Primera página<input name="first" type="number" min="1" value="1" required></label>
+      <label>Última página<input name="last" type="number" min="1" value="{{ d.bundle_page_end if d.is_bundle else 1 }}" required></label>
+      {% endif %}
+      <div class="form-actions"><button class="button button-secondary">Preparar pack de repaso</button></div>
+    </form>
+    <form method="post" action="/documents/{{ d.id }}/delete" onsubmit="return confirm('¿Eliminar el material y su texto extraído?')"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="text-button danger">Eliminar material</button></form>
+  </details>{% endfor %}</div>{% else %}<p class="empty">Todavía no hay materiales.</p>{% endif %}
+</section>
+{% if packs %}
+<section class="card section-block">
+  <div class="section-heading"><h2>Packs de repaso</h2></div>
+  <ul>{% for pack in packs %}<li><a href="/packs/{{ pack.id }}">{{ pack.title }}</a> · {{ "Asignado" if pack.assigned else "Borrador" }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<section class="card section-block"><div class="section-heading"><h2>Ejercicios recientes</h2></div>
+  {% if exercises %}<div class="exercise-list">{% for e in exercises %}
+  <a class="exercise-row" href="/exercise/{{ e.id }}"><span class="status-dot {% if e.solved %}done{% endif %}"></span><span class="exercise-row-main"><strong>{{ e.topic }}</strong><small>{{ e.profile.name }} · {{ e.subject }} · {{ e.profile.course }}</small></span><span class="tag">{% if e.solved %}Completado{% else %}{{ e.attempts_count }} intentos{% endif %}</span></a>
+  {% endfor %}</div>{% else %}<p class="empty">Aún no hay ejercicios.</p>{% endif %}
+</section>
+<details class="card section-block usage-details">
+  <summary>Uso de IA este mes</summary>
+  <p>{{ provider|upper }} · {{ usage.calls }} consultas · {{ usage.input }} tokens de entrada · {{ usage.output }} de salida</p>
+  {% if provider|lower == "openai" %}<p>Coste estimado de consultas de texto · USD {{ "%.4f"|format(usage.cost) }}</p>{% endif %}
+</details>
+{% endblock %}

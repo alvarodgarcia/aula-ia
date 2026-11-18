@@ -1,0 +1,8 @@
+{% if active_practice %}
+<a class="button button-secondary" href="/mis-tareas/practica/{{ active_practice.id }}">Continuar práctica</a>
+{% else %}
+<form method="post" action="/mis-tareas/practica">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button class="button button-secondary">Practicar 5 minutos</button>
+</form>
+{% endif %}

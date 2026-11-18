@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block page_styles %}
+{% if age_group %}<link rel="stylesheet" href="/static/student.css?v=10">{% endif %}
+<link rel="stylesheet" href="/static/learning-visuals.css?v=7">
+{% endblock %}
+{% block body_attributes %}{% if age_group %} class="student student--{{ age_group }}"{% endif %}{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ '/supervision' if adult else '/mis-tareas/clase#notas' }}">← {{ "Supervisión" if adult else "Mis notas de clase" }}</a>
+<section class="card">
+  <h1>{% if adult %}{{ note.topic }}{% elif attachment.reviewed %}Editar apunte{% else %}Revisar texto extraído{% endif %}</h1>
+  <p>{{ attachment.filename }}</p>
+  {% if attachment.moderation == "blocked" %}<p class="notice">El adulto ha retirado este apunte del tutor y de los repasos.</p>{% endif %}
+  {% if attachment.moderation == "withdrawn" %}<p class="notice">El alumno retiró este apunte.</p>{% endif %}
+  {% if not attachment.is_photo and not attachment.files %}<p><a href="/mis-tareas/clase/material/{{ note.id }}/archivo">Descargar PDF</a></p>{% endif %}
+  <div{% if attachment.is_photo or attachment.files %} class="material-review"{% endif %}>
+    {% if attachment.is_photo %}
+    <figure><img src="/mis-tareas/clase/material/{{ note.id }}/archivo" alt="Foto del apunte"></figure>
+    {% endif %}
+    {% if attachment.files %}
+    {% with materials=attachment.files, file_base='/mis-tareas/clase/material/' ~ note.id ~ '/archivo/' %}{% include "material_previews.html" %}{% endwith %}
+    {% endif %}
+    {% if adult %}
+    <div class="shared-note-text">
+      <p>{{ note.subject }} · {{ note.day[8:10] }}/{{ note.day[5:7] }}/{{ note.day[:4] }}</p>
+      <p>{{ note.notes }}</p>
+    </div>
+    {% else %}
+    {% set values = form_values or note %}
+    <form method="post" action="/mis-tareas/clase/material/{{ note.id }}/revisar" class="stack review-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if not note.notes %}<p>No se detectó texto. Puedes escribir o resumir el contenido aquí.</p>{% endif %}
+      <label>Texto del apunte
+        <textarea name="notes" rows="10" maxlength="{{ text_limit }}" required>{{ values.notes }}</textarea>
+      </label>
+      <div class="form-grid">
+        <label>Asignatura<input name="subject" maxlength="80" value="{{ values.subject }}" required></label>
+        <label>Tema<input name="topic" maxlength="160" value="{{ values.topic }}" required></label>
+        <label>Fecha de clase<input name="day" type="date" value="{{ values.day }}" max="{{ today }}" required></label>
+      </div>
+      <div class="study-actions"><button class="button button-primary">Guardar apunte</button></div>
+    </form>
+    {% endif %}
+  </div>
+  {% if not adult %}
+    {% if attachment.reviewed and attachment.moderation != "blocked" %}
+    <form method="post" action="/mis-tareas/tutor" class="stack review-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="note_id" value="{{ note.id }}">
+      <label>Pídele al tutor que te ayude con este apunte
+        <textarea name="question" rows="2" maxlength="1500" required placeholder="Hazme 5 ejercicios de dificultad creciente."></textarea>
+      </label>
+      <div class="study-actions"><button class="button button-secondary">Preguntar al tutor</button></div>
+    </form>
+    {% endif %}
+    <form method="post" action="/mis-tareas/clase/material/{{ note.id }}/eliminar" onsubmit="return confirm('¿Retirar el apunte? El adulto podrá revisar el archivo en supervisión.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="text-button danger">Retirar apunte</button>
+    </form>
+  {% else %}
+  <form method="post" action="/supervision/material/{{ note.id }}" class="inline-actions">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if attachment.moderation != "approved" %}
+    <button class="button button-primary" name="action" value="approved">{{ "Volver a habilitar" if attachment.moderation in ("blocked", "withdrawn") else "Marcar como revisado" }}</button>
+    {% endif %}
+    {% if attachment.moderation not in ("blocked", "withdrawn") %}
+    <button class="button button-secondary" name="action" value="blocked">Retirar del tutor</button>
+    {% endif %}
+    <button class="text-button danger" name="action" value="delete" onclick="return confirm('¿Eliminar el texto y el archivo? Quedará constancia de la retirada.')">Eliminar archivo y texto</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,28 @@
+<details class="math-board" data-kind="{{ math_board.kind }}"{% if math_board.kind == "blocks" %} data-start="{{ math_board.start }}"{% endif %}>
+  {% if math_board.kind == "blocks" %}
+  <summary>Probar con bloques</summary>
+  <p>Empieza con {{ math_board.start }}. Añade o quita bloques para representar la operación.</p>
+  <div class="math-blocks">
+    <div><strong>Decenas</strong><div data-tens aria-hidden="true"></div></div>
+    <div><strong>Unidades</strong><div data-units aria-hidden="true"></div></div>
+  </div>
+  <p data-result role="status"></p>
+  <div class="study-actions">
+    {% for action, label in (("plus-one", "Añadir unidad"), ("minus-one", "Quitar unidad"), ("plus-ten", "Añadir decena"), ("minus-ten", "Quitar decena"), ("group", "Agrupar 10 unidades"), ("split", "Separar una decena"), ("reset", "Reiniciar")) %}
+    <button type="button" class="button button-secondary" data-move="{{ action }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+  {% else %}
+  <summary>Comparar con barras de fracciones</summary>
+  <div class="fraction-board">
+    {% for top, bottom in ((1, 2), (2, 4)) %}
+    <div data-fraction>
+      <label>Partes tomadas<input type="number" min="0" max="{{ bottom }}" value="{{ top }}" data-numerator></label>
+      <label>Partes iguales<input type="number" min="1" max="12" value="{{ bottom }}" data-denominator></label>
+      <div data-fraction-bar aria-hidden="true"></div>
+    </div>
+    {% endfor %}
+  </div>
+  <p data-result role="status"></p>
+  {% endif %}
+</details>

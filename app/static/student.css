@@ -1,0 +1,853 @@
+.student {
+  --student-accent: #4b3a9c;
+  --student-accent-hover: #39287e;
+  --student-tint: #eeebfa;
+  --student-edge: #d8d0ef;
+  --student-bg: #f7f6fb;
+  --student-heading: #221845;
+  --student-radius: 18px;
+  --student-size: 16px;
+  background: var(--student-bg);
+  color: var(--student-heading);
+  font-size: var(--student-size);
+}
+
+.student--early {
+  --student-accent: #5730aa;
+  --student-accent-hover: #432287;
+  --student-tint: #eee5ff;
+  --student-edge: #d9c7f8;
+  --student-bg: #fff9ed;
+  --student-heading: #2d1949;
+  --student-radius: 24px;
+  --student-size: 18px;
+  font-family: "Atkinson Hyperlegible Next", "Segoe UI", system-ui, sans-serif;
+}
+
+.student--primary {
+  --student-accent: #075c59;
+  --student-accent-hover: #044640;
+  --student-tint: #dbf3ed;
+  --student-edge: #afdcd0;
+  --student-bg: #f1f8f7;
+  --student-heading: #133a38;
+  --student-radius: 20px;
+  --student-size: 17px;
+}
+
+.student .container {
+  max-width: 1080px;
+}
+
+.student .card {
+  border-radius: var(--student-radius);
+}
+
+.student a:focus-visible,
+.student button:focus-visible,
+.student input:focus-visible,
+.student textarea:focus-visible,
+.student select:focus-visible {
+  outline: 3px solid var(--student-accent);
+  outline-offset: 3px;
+}
+
+.student .button {
+  display: inline-grid;
+  min-height: 46px;
+  place-items: center;
+  text-align: center;
+  text-decoration: none;
+}
+
+.student .button-primary {
+  background: var(--student-accent);
+  color: #fff;
+}
+
+.student .button-primary:hover {
+  background: var(--student-accent-hover);
+}
+
+.student .button-secondary {
+  border: 1px solid var(--student-edge);
+  background: var(--student-tint);
+  color: var(--student-accent-hover);
+}
+
+.student .exercise-card label,
+.student .tutor-card label,
+.student .login-card label,
+.student input,
+.student textarea,
+.student select {
+  font-size: var(--student-size);
+}
+
+.student-heading {
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 32%);
+  align-items: end;
+  gap: 24px;
+  padding: clamp(20px, 4vw, 40px);
+  border: 1px solid var(--student-edge);
+  border-radius: var(--student-radius);
+  background: var(--student-tint);
+}
+
+.student-heading > div:first-child {
+  grid-column: 1 / -1;
+}
+
+.student-heading:has(.student-progress) > div:first-child {
+  grid-column: auto;
+}
+
+.student-heading h1 {
+  margin: 2px 0;
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+
+.student-heading p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.student-greeting {
+  color: var(--student-accent-hover);
+  font-weight: 650;
+}
+
+.student-progress {
+  display: grid;
+  gap: 5px;
+}
+
+.student-progress label {
+  color: var(--student-accent-hover);
+  font-size: .88em;
+}
+
+.student-progress progress {
+  width: 100%;
+  height: 12px;
+  accent-color: var(--student-accent);
+}
+
+.student-section {
+  margin-top: 30px;
+}
+
+.study-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.study-actions p {
+  flex-basis: 100%;
+  margin: 3px 0 0;
+}
+
+.class-review-actions,
+.class-review-context {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--student-tint);
+  color: var(--student-heading);
+}
+
+.class-review-actions p {
+  margin: 0 0 8px;
+}
+
+@media (min-width: 660px) {
+  .class-filters {
+    grid-template-columns: 1.2fr 1fr 1fr;
+  }
+}
+
+.class-review-context small {
+  display: block;
+}
+
+.note-dictation small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.note-dictation p {
+  margin: 6px 0 0;
+  color: var(--student-accent-hover);
+}
+
+.note-dictation p:empty {
+  display: none;
+}
+
+.student [data-record-note][hidden] {
+  display: none;
+}
+
+.study-list {
+  padding-left: 24px;
+}
+
+.study-list li {
+  margin-bottom: 14px;
+}
+
+.study-list p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.study-list small {
+  display: block;
+}
+
+.math-board {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--student-edge);
+  border-radius: 12px;
+}
+
+.math-board summary {
+  cursor: pointer;
+  color: var(--student-accent-hover);
+  font-weight: 700;
+}
+
+.math-blocks,
+.fraction-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.math-blocks [data-tens],
+.math-blocks [data-units] {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 3px;
+  min-height: 34px;
+}
+
+.math-ten,
+.math-unit {
+  display: inline-block;
+  border: 1px solid var(--student-accent);
+  background: var(--student-tint);
+  border-radius: 2px;
+}
+
+.math-ten { width: 9px; height: 31px; }
+.math-unit { width: 13px; height: 13px; }
+
+.fraction-board {
+  margin-top: 10px;
+}
+
+.fraction-board label {
+  margin-bottom: 5px;
+}
+
+[data-fraction-bar] {
+  display: flex;
+  height: 20px;
+  gap: 1px;
+}
+
+.fraction-part {
+  flex: 1;
+  border: 1px solid var(--student-accent);
+  background: #fff;
+}
+
+.fraction-part.is-taken {
+  background: var(--student-accent);
+}
+
+.math-board button:disabled {
+  opacity: .6;
+}
+
+.student-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 34%);
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.student-dashboard > .student-tutor {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.student-dashboard-tasks {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.student-dashboard-tasks .student-section:first-child {
+  margin-top: 0;
+}
+
+.student-section h2 {
+  margin: 0 0 10px;
+  font-size: 1.27em;
+}
+
+.student-exercise-history > summary {
+  width: fit-content;
+  margin-bottom: 10px;
+  padding: 5px 0;
+  color: var(--student-accent-hover);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.history-filters {
+  margin-bottom: 12px;
+}
+
+.student-task-featured {
+  margin-bottom: 12px;
+  min-height: 104px;
+  border-color: var(--student-edge);
+  background: var(--student-tint);
+}
+
+.student-task-featured .student-task-action {
+  background: var(--student-accent);
+  color: white;
+}
+
+.student-task-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.student--early .student-task-list,
+.student--primary .student-task-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.student-task {
+  display: flex;
+  height: 100%;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--student-radius);
+  background: #fff;
+  color: var(--student-heading);
+  text-decoration: none;
+}
+
+.student--early .student-task,
+.student--primary .student-task {
+  min-height: 108px;
+}
+
+.student-task:hover {
+  border-color: var(--student-accent);
+}
+
+.student-task > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.student-task h3 {
+  margin: 2px 0 0;
+  font-size: 1.05em;
+  line-height: 1.3;
+}
+
+.student-subject,
+.student-task-status {
+  color: var(--student-accent-hover);
+  font-size: .87em;
+  font-weight: 650;
+}
+
+.student-task-status {
+  display: block;
+  margin-top: 4px;
+}
+
+.student-task-action {
+  flex-shrink: 0;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: var(--student-tint);
+  color: var(--student-accent-hover);
+  font-size: .88em;
+  font-weight: 700;
+}
+
+.student-task--done .student-task-action {
+  background: #e7f6eb;
+  color: #215836;
+}
+
+.student-empty {
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--student-radius);
+  background: #fff;
+  color: #46566a;
+}
+
+.student .back-link {
+  padding: 10px 0;
+  color: var(--student-accent-hover);
+  font-weight: 650;
+}
+
+.student .exercise-card > .student-subject {
+  margin: 0;
+}
+
+.student .exercise-layout {
+  align-items: start;
+}
+
+.student .exercise-card h1,
+.student .prompt {
+  overflow-wrap: anywhere;
+}
+
+.student .prompt {
+  border-color: var(--student-edge);
+  background: var(--student-tint);
+  color: var(--student-heading);
+  font-size: 1.06em;
+}
+
+.student .notice {
+  overflow-wrap: anywhere;
+}
+
+.student--early .button {
+  min-height: 50px;
+  font-size: 16px;
+}
+
+.student-nav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid var(--student-edge);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.student-nav a {
+  display: grid;
+  flex: 1 1 0;
+  min-height: 44px;
+  place-items: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  color: var(--student-accent-hover);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.student-nav a[aria-current] {
+  background: var(--student-tint);
+  color: var(--student-heading);
+}
+
+.student-nav a:hover {
+  background: var(--student-tint);
+}
+
+.student-home-actions,
+.student-section-link,
+.tutor-oversight {
+  margin-top: 14px;
+}
+
+.student-study-heading {
+  margin-bottom: 18px;
+}
+
+.student-study-heading h1 {
+  margin-bottom: 10px;
+}
+
+.student-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+}
+
+.student-review-grid h2 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.tutor-oversight {
+  display: block;
+}
+
+#student-tutor,
+#tareas-pendientes,
+#escribir-apunte,
+#subir-material,
+#notas {
+  scroll-margin-top: 12px;
+}
+
+.student--early .answer-form .button,
+.student--early .tutor-card .button {
+  align-self: start;
+}
+
+.student .tutor-card form {
+  margin-top: 16px;
+}
+
+.tutor-question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tutor-reply {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--student-edge);
+  border-radius: 12px;
+  background: var(--student-tint);
+}
+
+.tutor-reply h3 {
+  margin: 0 0 5px;
+  font-size: 1em;
+}
+
+.tutor-reply #tutor-reply-text {
+  color: var(--student-heading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tutor-reply [data-tutor-voice-control]:not([hidden]) {
+  margin-top: 10px;
+}
+
+.tutor-user-question,
+.tutor-history p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.student .tutor-card .tutor-user-question {
+  margin-top: 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--student-edge);
+}
+
+.tutor-history {
+  font-size: .9em;
+}
+
+.tutor-history summary {
+  color: var(--student-accent-hover);
+  cursor: pointer;
+}
+
+.tutor-history ol {
+  padding-left: 24px;
+}
+
+.student .tutor-history p {
+  margin-bottom: 6px;
+}
+
+.tutor-toggle {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tutor-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.tutor-toggle:focus-visible {
+  outline: 3px solid var(--student-accent);
+  outline-offset: 5px;
+  border-radius: 12px;
+}
+
+.tutor-portrait {
+  display: grid;
+  flex: 0 0 auto;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--student-tint);
+}
+
+.student--early .tutor-portrait {
+  width: 86px;
+  height: 86px;
+}
+
+.student--teen .tutor-portrait {
+  width: 46px;
+  height: 46px;
+}
+
+.tutor-mascot {
+  width: 94%;
+  height: 94%;
+  object-fit: contain;
+  animation: tutor-float 3.1s ease-in-out 2;
+}
+
+.student--teen [data-state="idle"] .tutor-mascot {
+  animation: none;
+}
+
+.student-tutor[data-state="thinking"] .tutor-mascot {
+  animation: tutor-think 1.5s ease-in-out infinite;
+}
+
+.student-tutor[data-state="speaking"] .tutor-mascot {
+  animation: tutor-speak .9s ease-in-out infinite;
+}
+
+.student-tutor.tutor-motion-reduced .tutor-mascot {
+  animation: none;
+}
+
+.tutor-intro {
+  display: grid;
+  flex: 1;
+  line-height: 1.22;
+}
+
+.tutor-intro strong {
+  font-size: 1.3em;
+}
+
+.tutor-label,
+.tutor-state {
+  color: var(--student-accent-hover);
+  font-size: .8em;
+  font-weight: 650;
+}
+
+.tutor-state:not(:empty) {
+  margin-top: 4px;
+}
+
+.tutor-chevron {
+  color: var(--student-accent-hover);
+  font-size: 1.35em;
+  line-height: 1;
+}
+
+.student-tutor details[open] .tutor-chevron {
+  transform: rotate(180deg);
+}
+
+.tutor-content {
+  margin-top: 16px;
+}
+
+.tutor-conversation {
+  margin: 14px 0;
+}
+
+.tutor-conversation[hidden],
+.tutor-conversation [hidden] {
+  display: none;
+}
+
+.tutor-conversation [data-conversation-status]:empty {
+  display: none;
+}
+
+.tutor-greeting-control {
+  margin-top: 12px;
+}
+
+.tutor-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.student .tutor-card .tutor-actions form {
+  margin: 0;
+}
+
+.student .tutor-actions .button {
+  width: 100%;
+}
+
+.tutor-preferences:not([hidden]) {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.tutor-preferences > summary {
+  color: var(--student-accent-hover);
+  cursor: pointer;
+  font-size: .86em;
+  font-weight: 650;
+}
+
+.tutor-preferences[open] > .tutor-characters {
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.student .tutor-preferences label {
+  font-size: .86em;
+}
+
+.tutor-characters {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tutor-character-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tutor-character-options label {
+  position: relative;
+  cursor: pointer;
+}
+
+.tutor-character-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.tutor-character-options span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.tutor-character-options img {
+  object-fit: contain;
+}
+
+.tutor-character-options input:checked + span {
+  border-color: var(--student-accent);
+  background: var(--student-tint);
+  color: var(--student-accent-hover);
+}
+
+.tutor-character-options input:focus-visible + span {
+  outline: 2px solid var(--student-accent);
+  outline-offset: 2px;
+}
+
+.student .tutor-motion {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.student .tutor-motion input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--student-accent);
+}
+
+@keyframes tutor-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes tutor-think {
+  0%, 100% { transform: rotate(0); }
+  50% { transform: rotate(-7deg) translateY(-3px); }
+}
+
+@keyframes tutor-speak {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.045); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-tutor[data-state] .tutor-mascot {
+    animation: none;
+  }
+
+  #tutor-motion-control {
+    display: none;
+  }
+}
+
+@media (max-width: 660px) {
+  .student-heading,
+  .student--early .student-task-list,
+  .student--primary .student-task-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-heading {
+    gap: 16px;
+  }
+
+  .student .exercise-card .button,
+  .student .tutor-card .button,
+  .student .exercise-card .inline-actions form {
+    width: 100%;
+  }
+}
+
+@media (max-width: 800px) {
+  .student-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-dashboard > .student-tutor,
+  .student-dashboard-tasks {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}

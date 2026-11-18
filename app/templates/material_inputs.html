@@ -1,0 +1,16 @@
+<fieldset class="material-choices" data-material-choices data-max-files="{{ max_material_files }}">
+  <legend>Material de clase</legend>
+  <div class="material-options">
+    <label class="material-option">
+      <span>Hacer foto</span>
+      <input type="file" name="camera_photo" accept="{{ photo_accept }}" capture="environment" aria-describedby="material-selection">
+    </label>
+    <label class="material-option">
+      <span>Elegir archivos</span>
+      <input type="file" name="file" accept="{{ upload_accept }}" aria-describedby="material-selection" multiple>
+    </label>
+  </div>
+  <small>PDF, JPG, PNG, WebP o HEIC. Hasta {{ max_material_files }} archivos por paquete.</small>
+  <p id="material-selection" data-material-selection role="status" hidden></p>
+  <ol class="material-queue" data-material-queue hidden></ol>
+</fieldset>

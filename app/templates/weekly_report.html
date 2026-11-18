@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block page_styles %}<link rel="stylesheet" href="/static/learning-visuals.css">{% endblock %}
+{% block content %}
+<a class="back-link" href="/#acceso-alumnos">← Panel de adulto</a>
+<header class="report-heading">
+  <h1>Resumen semanal de {{ profile.name }}</h1>
+  <p>{{ period }} · {{ profile.course }} {{ profile.stage }}</p>
+</header>
+  {% if topics %}
+  <dl class="report-totals">
+    <div class="card"><dt>Aciertos</dt><dd>{{ total_correct }}</dd></div>
+    <div class="card"><dt>Respuestas por revisar</dt><dd>{{ total_missed }}</dd></div>
+    <div class="card"><dt>Pistas solicitadas</dt><dd>{{ total_hints }}</dd></div>
+  </dl>
+  {% if total_correct or total_missed %}
+  <section class="card section-block" aria-labelledby="daily-title">
+    <h2 id="daily-title">Respuestas por día</h2>
+    <ul class="report-legend"><li>Aciertos</li><li>Por revisar</li></ul>
+    <ol class="report-chart">
+      {% for day in days %}
+      <li>
+        <span class="report-day-total" aria-hidden="true">{{ day.correct + day.missed }}</span>
+        <div class="report-day-track" aria-hidden="true">
+          <span class="report-bar-correct" style="height: {{ (day.correct * 100 / chart_peak)|round|int }}%"></span>
+          <span class="report-bar-missed" style="height: {{ (day.missed * 100 / chart_peak)|round|int }}%"></span>
+        </div>
+        <span class="report-day-label"><span>{{ day.weekday }}</span> <span>{{ day.number }}</span></span>
+        <span class="study-visually-hidden">{{ day.correct }} {{ "acierto" if day.correct == 1 else "aciertos" }}, {{ day.missed }} {{ "respuesta" if day.missed == 1 else "respuestas" }} por revisar.</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+  <section class="card section-block" aria-labelledby="weekly-topics">
+  <h2 id="weekly-topics">Por tema</h2>
+  <ul class="attempt-list report-topics">
+    {% for (subject, topic), data in topics %}
+    <li>
+      <div>
+        <strong>{{ subject }} · {{ topic }}</strong>
+        <p>{{ data.correct }} {{ "acierto" if data.correct == 1 else "aciertos" }} · {{ data.missed }} {{ "respuesta" if data.missed == 1 else "respuestas" }} por revisar · {{ data.hints }} {{ "pista solicitada" if data.hints == 1 else "pistas solicitadas" }}</p>
+        {% if data.review_id %}
+        <form method="post" action="/profiles/{{ profile.id }}/semana/repaso/{{ data.review_id }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="button button-secondary">Asignar repaso</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  </section>
+  {% else %}<p class="card">Aún no hay respuestas ni pistas en este periodo.</p>{% endif %}
+{% endblock %}

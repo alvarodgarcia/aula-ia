@@ -302,6 +302,7 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 templates = Jinja2Templates(directory=ROOT / "templates")
 templates.env.globals["tutor_voice_signature"] = voice.voice_signature
 templates.env.globals["tutor_greetings"] = voice.GREETINGS
+templates.env.globals["tutor_conversation_notices"] = voice.CONVERSATION_NOTICES
 templates.env.globals["tutor_conversation_available"] = lambda: bool(voice.voice_api_key())
 
 @app.on_event("startup")
@@ -2184,7 +2185,7 @@ async def tutor_voice(
         daily_limit = policy.daily_limit if policy else DEFAULT_DAILY_TUTOR_LIMIT
         if daily_limit == 0:
             raise HTTPException(status_code=429, detail="El adulto ha pausado la IA de este perfil.")
-        cache_key = hashlib.sha256(f"{profile_id}:{character}:{age_group}:{voice.MODEL}:{text}".encode()).hexdigest()
+        cache_key = hashlib.sha256(f"{profile_id}:{character}:{age_group}:{voice.MODEL}:{voice.STYLE_REVISION}:{text}".encode()).hexdigest()
         clip = db.get(VoiceClip, cache_key)
         if clip is not None:
             return Response(clip.data, media_type="audio/wav", headers={"Cache-Control": "no-store"})

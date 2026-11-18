@@ -1,5 +1,16 @@
 # Cambios de Aula IA
 
+## Revisión de 1.1.0 · Voz y conversación · 2026-11-18
+
+Mantenimiento solicitado sin crear otra versión ni sustituir etiquetas o entregas publicadas.
+
+- Instrucciones de voz más precisas para castellano peninsular y una entonación conversacional, manteniendo los personajes.
+- Prioridad de voces es-ES y de voces naturales en la lectura de respaldo del navegador; menor alteración artificial del tono.
+- Renovación de la caché de audio al cambiar el estilo, para no reutilizar la entonación anterior.
+- Toque de voz tras unos 30 segundos de silencio, con cierre del micrófono a los dos minutos de inactividad.
+- Aviso ante sonido fuerte y constante durante unos ocho segundos. Es una estimación de la señal, no un reconocimiento fiable de todos los tipos de ruido.
+- Los avisos respetan los límites de síntesis existentes; el ruido detectado se descarta localmente en vez de enviarse como un turno.
+
 ## 1.1.0 · 2026-11-18
 
 - Página pública «Privacidad y uso de IA», con información para alumnos y adulto sobre datos, supervisión, proveedores, conservación y eliminación en el ámbito familiar.

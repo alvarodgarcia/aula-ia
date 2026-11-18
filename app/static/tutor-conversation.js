@@ -14,6 +14,9 @@
   const extensions = { "audio/webm": "webm", "video/webm": "webm", "audio/mp4": "m4a", "audio/ogg": "ogg", "audio/wav": "wav" };
   const maxTurnLength = 90000;
   const idleLimit = 120000;
+  const nudgeAfter = 30000;
+  const noiseAfter = 8000;
+  const noticeCooldown = 45000;
   let session;
 
   controls.hidden = false;
@@ -89,13 +92,51 @@
     }
   }
 
-  function listen(active, message = "Te escucho.") {
+  function listen(active, message = "Te escucho.", preserveIdle = false) {
     if (session !== active) return;
     discardRecording(active);
     active.listeningAt = performance.now();
+    if (!preserveIdle) {
+      active.idleSince = active.listeningAt;
+      active.nudged = false;
+    }
+    active.noiseWindow = undefined;
+    active.noisySince = null;
     active.speechAt = active.lastVoice = active.aboveSince = null;
     phase(active, "listening", message);
-    startRecording(active);
+    if (!active.noiseSuppressed) startRecording(active);
+  }
+
+  function notify(active, kind) {
+    if (session !== active) return;
+    const notice = controls.querySelector(`[data-conversation-notice="${kind}"]`);
+    const text = notice?.textContent;
+    if (!text) return;
+    if (kind === "noise") {
+      active.noiseSuppressed = true;
+      active.quietSince = null;
+    }
+    discardRecording(active);
+    phase(active, "notifying", text);
+    tutor.dispatchEvent(new CustomEvent("tutor:read-conversation", { detail: {
+      text, signature: notice.dataset.signature, character: question.elements.character.value,
+      audioContext: active.context,
+      done: () => {
+        if (session === active && active.phase === "notifying") listen(active, text, true);
+      },
+    } }));
+  }
+
+  function persistentNoise(active, level, now) {
+    // A sustained, relatively flat loud signal is a warning heuristic, not speech recognition.
+    const window = active.noiseWindow ??= { at: now, min: level, max: level };
+    window.min = Math.min(window.min, level);
+    window.max = Math.max(window.max, level);
+    if (now - window.at < 1000) return false;
+    const steady = window.min >= 0.02 && window.max - window.min < window.min * 0.65;
+    active.noisySince = steady ? (active.noisySince ?? window.at) : null;
+    active.noiseWindow = { at: now, min: level, max: level };
+    return active.noisySince !== null && now - active.noisySince >= noiseAfter;
   }
 
   function finishTurn(active) {
@@ -142,6 +183,34 @@
       return;
     }
 
+    if (persistentNoise(active, level, now)) {
+      if (now - active.idleSince >= idleLimit) {
+        stop("El micrófono se ha cerrado al continuar el ruido sin un turno claro. Puedes reanudar en un lugar más tranquilo.");
+      } else if (active.noiseNoticeAt === undefined || now - active.noiseNoticeAt >= noticeCooldown) {
+        active.noiseNoticeAt = now;
+        notify(active, "noise");
+      } else {
+        // Discard constant noise locally instead of submitting it as repeated paid turns.
+        listen(active, "Sigue habiendo sonido de fondo. Busca un lugar tranquilo o finaliza la conversación.", true);
+      }
+      return;
+    }
+
+    if (active.noiseSuppressed) {
+      if (level < 0.012) {
+        active.quietSince ??= now;
+        if (now - active.quietSince >= 500) {
+          active.noiseSuppressed = false;
+          active.quietSince = null;
+          listen(active, "Ya se oye más tranquilo. Te escucho.", true);
+        }
+      } else {
+        active.quietSince = null;
+      }
+      if (now - active.idleSince >= idleLimit) stop("El micrófono se ha cerrado mientras esperábamos un ambiente más tranquilo. Puedes reanudar cuando quieras.");
+      return;
+    }
+
     const onset = Math.max(0.005, active.noiseFloor * 2.4 + 0.0015);
     const sustain = Math.max(0.0035, active.noiseFloor * 1.7 + 0.001);
     if (level >= (active.speechAt === null ? onset : sustain)) {
@@ -160,8 +229,11 @@
       const speakingLength = active.lastVoice - active.speechAt;
       const silence = speakingLength > 3500 ? 1750 : 1250;
       if (now - active.lastVoice >= silence || now - active.speechAt >= maxTurnLength) finishTurn(active);
-    } else if (now - active.listeningAt >= idleLimit) {
+    } else if (now - active.idleSince >= idleLimit) {
       stop("El micrófono se ha cerrado por inactividad. Puedes reanudar cuando quieras.");
+    } else if (!active.nudged && now - active.idleSince >= nudgeAfter) {
+      active.nudged = true;
+      notify(active, "silence");
     }
   }
 

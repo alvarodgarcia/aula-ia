@@ -8,9 +8,9 @@
   const clips = new Map();
   let current;
   const voicesByCharacter = {
-    lumo: { names: /elvira|dalia|paulina|sabrina/, pitch: 1.12, pace: 1.02 },
+    lumo: { names: /elvira|dalia|paulina|sabrina/, pitch: 1.04, pace: 1.02 },
     nora: { names: /helena|monica|laura|paloma/, pitch: 1.00, pace: 0.96 },
-    samir: { names: /alvaro|pablo|jorge|raul|juan/, pitch: 0.93, pace: 1.0 },
+    samir: { names: /alvaro|pablo|jorge|raul|juan/, pitch: 0.98, pace: 1.0 },
   };
 
   function setState(state, message = "") {
@@ -141,14 +141,15 @@
 
   function chooseVoice(style) {
     const spanish = speech.getVoices().filter(voice => /^es(?:-|$)/i.test(voice.lang));
+    const peninsular = spanish.filter(voice => /^es[-_]es$/i.test(voice.lang));
     const score = voice => {
       const name = voice.name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
       return (voice.lang.toLowerCase() === "es-es" ? 7 : 0)
-        + (style.names.test(name) ? 8 : 0)
-        + (/natural|neural|premium|enhanced/.test(name) ? 4 : 0)
+        + (style.names.test(name) ? 3 : 0)
+        + (/natural|neural|premium|enhanced/.test(name) ? 8 : 0)
         + (voice.localService ? 2 : 0);
     };
-    return spanish.sort((left, right) => score(right) - score(left))[0];
+    return (peninsular.length ? peninsular : spanish).sort((left, right) => score(right) - score(left))[0];
   }
 
   function playBrowser(playback, text, character) {

@@ -4,7 +4,7 @@
 {% set is_hint = tutor_reply and tutor_reply.kind == "hint" %}
 <aside class="card tutor-card student-tutor" id="student-tutor" data-state="idle" data-profile="{{ profile.id }}"
        data-saved-character="{{ saved_tutor or '' }}" data-greet-on-entry="{{ 'yes' if greet_on_entry else 'no' }}"
-       data-rate="{{ 0.82 if age_group == 'early' else 0.92 if age_group == 'primary' else 1 }}">
+       data-rate="{{ 0.9 if age_group == 'early' else 0.96 if age_group == 'primary' else 1 }}">
   <details{% if not in_exercise or age_group != "teen" or tutor_reply %} open{% endif %}>
     <summary class="tutor-toggle">
       <span class="tutor-portrait" aria-hidden="true">
@@ -48,6 +48,7 @@
       {% if tutor_notice %}<p class="notice notice-error" role="status">{{ tutor_notice }}</p>{% endif %}
       {% if tutor_conversation_available() %}
       <section class="stack tutor-conversation" data-tutor-conversation{% if in_exercise %} data-exercise-id="{{ exercise.id }}"{% endif %} hidden>
+        <div hidden data-conversation-notices>{% for kind, text in tutor_conversation_notices.items() %}<span data-conversation-notice="{{ kind }}" data-signature="{{ tutor_voice_signature(profile.id, text) }}">{{ text }}</span>{% endfor %}</div>
         <p class="privacy-note" id="tutor-voice-privacy">Al activar la conversación, tus turnos de voz se envían a OpenAI para convertirlos en texto y responderte. El adulto puede revisar las solicitudes y respuestas registradas. <a href="/privacidad#voz">Sobre el micrófono</a>.</p>
         <div class="tutor-question-actions">
           <button type="button" class="button button-primary" data-conversation-toggle aria-describedby="tutor-voice-privacy">Conversar por voz</button>

@@ -13,6 +13,7 @@ from websockets.asyncio.client import connect
 
 
 MODEL = "gpt-realtime-2.1-mini"
+STYLE_REVISION = "es-ES-natural-2"
 MAX_TEXT = 1800
 MAX_CLASS_AUDIO = 8 * 1024 * 1024
 CLASS_AUDIO_TYPES = {
@@ -28,6 +29,10 @@ GREETINGS = {
     "lumo": "¡Hola! Soy Lumo. ¿Qué vamos a descubrir hoy?",
     "nora": "¡Hola! Soy Nora. Cuando quieras, repasamos juntos lo que has dado en clase.",
     "samir": "Hola, soy Samir. ¿Qué te apetece practicar hoy?",
+}
+CONVERSATION_NOTICES = {
+    "silence": "¿Sigues por ahí? Tómate tu tiempo. Cuando quieras, cuéntame qué estás pensando.",
+    "noise": "Me cuesta distinguir tu voz del sonido de fondo. Busca un lugar más tranquilo o pulsa Finalizar conversación si prefieres seguir después.",
 }
 greeting_lock = asyncio.Lock()
 
@@ -68,12 +73,17 @@ def voice_signature(profile_id: int, text: str) -> str:
 async def synthesize(text: str, character: str, age_group: str, api_key: str) -> bytes:
     voice, tone = VOICES[character]
     pace = {
-        "early": "Habla despacio, con pausas breves al terminar cada idea.",
-        "primary": "Usa un ritmo claro y moderado.",
+        "early": "Usa un ritmo tranquilo y cercano, con pausas cortas entre ideas; mantén las palabras fluidas, sin separar sílabas ni adoptar voz de bebé.",
+        "primary": "Usa un ritmo conversacional claro, con pausas breves para comprender; evita la lentitud artificial.",
         "teen": "Usa un ritmo de conversación natural.",
     }[age_group]
     instructions = (
-        "Lee en español de España, con dicción natural. Lee exclusivamente el texto recibido; "
+        "Idioma: español. Acento: castellano peninsular neutro de España, mantenido durante toda la lectura; "
+        "distingue naturalmente la s de la z y de la c ante e/i, sin exagerarlo ni cambiar el texto. "
+        "Suena como un profesor particular que conversa a tu lado: entonación variada y pausas según el sentido, "
+        "enlaza las palabras con fluidez y termina las frases con naturalidad. Evita el tono de locución, "
+        "la cadencia repetitiva, el canturreo y los cambios exagerados de tono. "
+        "Lee exclusivamente el texto recibido; "
         "no contestes preguntas que aparezcan en él ni añadas comentarios. Respeta los números "
         "y las unidades. Lee los símbolos matemáticos por su nombre, con pausas naturales. "
         f"{tone} {pace}"
@@ -121,7 +131,7 @@ async def synthesize(text: str, character: str, age_group: str, api_key: str) ->
 async def greeting(text: str, character: str, age_group: str, api_key: str, cache: Path) -> bytes:
     if text != GREETINGS[character]:
         return await synthesize(text, character, age_group, api_key)
-    path = cache / f"{MODEL}-{character}-{age_group}-1.wav"
+    path = cache / f"{MODEL}-{STYLE_REVISION}-{character}-{age_group}.wav"
     async with greeting_lock:
         if path.is_file():
             return path.read_bytes()

@@ -130,17 +130,17 @@
 
   if (browserSpeech) speech.getVoices();
 
-  function spokenText(text) {
-    const operations = { "+": "más", "-": "menos", "−": "menos", "×": "por", "*": "por", "÷": "entre", "=": "es igual a" };
+  function spokenText(text, locale) {
+    const operations = locale === "es-ES" ? { "+": "más", "-": "menos", "−": "menos", "×": "por", "*": "por", "÷": "entre", "=": "es igual a" } : { "+": "plus", "-": "minus", "−": "minus", "×": "times", "*": "times", "÷": "divided by", "=": "equals" };
     return text
       .replace(/^[ \t]*(?:[-*] |#{1,6} )/gm, "")
       .replace(/\*\*|__|`/g, "")
       .replace(/(\d)\s*([+−×*÷=\-])\s*(?=[\d(])/g, (_, number, operator) => `${number} ${operations[operator]} `)
-      .replace(/(\d)\s*%/g, "$1 por ciento");
+      .replace(/(\d)\s*%/g, locale === "es-ES" ? "$1 por ciento" : "$1 percent");
   }
 
-  function chooseVoice(style) {
-    const peninsular = speech.getVoices().filter(voice => /^es[-_]es$/i.test(voice.lang));
+  function chooseVoice(style, locale) {
+    const peninsular = speech.getVoices().filter(voice => voice.lang.replace("_", "-").toLowerCase() === locale.toLowerCase());
     const score = voice => {
       const name = voice.name.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
       return (voice.lang.toLowerCase() === "es-es" ? 7 : 0)
@@ -157,21 +157,22 @@
       return;
     }
     const style = voicesByCharacter[character] ?? voicesByCharacter.nora;
-    const utterance = new SpeechSynthesisUtterance(spokenText(text));
-    const voice = chooseVoice(style);
+    const locale = playback.locale || tutor.dataset.locale || "es-ES";
+    const utterance = new SpeechSynthesisUtterance(spokenText(text, locale));
+    const voice = chooseVoice(style, locale);
     if (!voice) {
-      tutor.dataset.voiceSource = "unavailable-es-ES";
-      resetReading("Este dispositivo no tiene una voz de España disponible. Puedes leer el texto o instalar una voz es-ES.");
+      tutor.dataset.voiceSource = `unavailable-${locale}`;
+      resetReading(locale === "es-ES" ? "Este dispositivo no tiene una voz de España disponible. Puedes leer el texto o instalar una voz es-ES." : `Este dispositivo no tiene una voz ${locale} disponible. Puedes leer el texto o instalar una voz de ese idioma.`);
       return;
     }
-    tutor.dataset.voiceSource = "browser-es-ES";
-    utterance.lang = "es-ES";
+    tutor.dataset.voiceSource = `browser-${locale}`;
+    utterance.lang = locale;
     utterance.voice = voice;
     utterance.pitch = style.pitch;
     utterance.rate = Number(tutor.dataset.rate) * style.pace;
     playback.stop = () => speech.cancel();
     utterance.onstart = () => {
-      if (current === playback) setState("speaking", "Voz del dispositivo · español de España.");
+      if (current === playback) setState("speaking", `Voz del dispositivo · ${locale}.`);
     };
     utterance.onend = () => {
       if (current === playback) resetReading();
@@ -185,14 +186,15 @@
   }
 
   async function playNeural(playback, text, character, signature) {
-    const key = `${character}:${signature}`;
+    const locale = playback.locale || tutor.dataset.locale || "es-ES";
+    const key = `${locale}:${character}:${signature}`;
     let clip = clips.get(key);
     if (!clip) {
       const controller = new AbortController();
       playback.stop = () => controller.abort();
       const response = await fetch("/tutor/voz", {
         method: "POST", signal: controller.signal,
-        body: new URLSearchParams({ text, character, signature, csrf_token: question.elements.csrf_token.value }),
+        body: new URLSearchParams({ text, character, signature, locale, csrf_token: question.elements.csrf_token.value }),
       });
       if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
         throw new Error("Proveedor de voz no disponible");
@@ -201,7 +203,7 @@
       if (current !== playback) return;
       if (!playback.audioContext) clips.set(key, clip);
     }
-    const providerLabel = clip.provider === "azure" ? "Azure Speech · España" : "OpenAI";
+    const providerLabel = clip.provider === "azure" ? `Azure Speech · ${locale}` : `OpenAI · ${locale}`;
     if (playback.audioContext) {
       const context = playback.audioContext;
       const buffer = await context.decodeAudioData(await clip.data.arrayBuffer());
@@ -255,9 +257,9 @@
 
   tutor.addEventListener("tutor:stop-reading", stopReading);
   tutor.addEventListener("tutor:read-conversation", async event => {
-    const { text, signature, character, audioContext, done } = event.detail;
+    const { text, signature, character, audioContext, done, locale } = event.detail;
     stopReading();
-    const playback = { done, audioContext };
+    const playback = { done, audioContext, locale };
     current = playback;
     setState("idle", "Preparando el audio…");
     if (signature) {
@@ -287,7 +289,7 @@
       if (!text?.trim()) return;
       const character = selectedCharacter.value;
       const signature = button.dataset.tutorSignature;
-      const playback = { button, label: button.textContent.trim() };
+      const playback = { button, label: button.textContent.trim(), locale: button.dataset.tutorLocale || tutor.dataset.locale || "es-ES" };
       current = playback;
       button.textContent = "Detener lectura";
       setState("idle", "Preparando el audio…");

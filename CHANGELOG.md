@@ -1,5 +1,14 @@
 # Cambios de Aula IA
 
+## 1.3.0 · 2026-11-21
+
+- Modo Inglés con conversación, gramática, vocabulario, lectura, escucha y escritura sobre el tutor y personaje existentes.
+- Configuración del adulto por alumno: nivel orientativo independiente del curso, objetivo, variedad británica/americana y ayuda en español o solo inglés.
+- Enseñanza especializada y autocorrección, aplicada también a ejercicios y repasos de inglés. Las ayudas en castellano se validan y guardan aparte de la respuesta inglesa.
+- Seguimiento de turnos por habilidad, palabras practicadas y observaciones del tutor; visible al alumno y al adulto. No se asignan certificaciones ni se evalúa la pronunciación del audio.
+- Voces Azure en en-GB/en-US, firmas y cachés por idioma y respaldo del dispositivo del mismo idioma. Se mantienen voces es-ES y límites/proveedores separados.
+- Dos tablas nuevas; no se alteran las columnas de datos existentes ni las claves locales.
+
 ## 1.2.1 · 2026-11-18
 
 - Separación completa de OpenAI y Azure en el panel de consumo y en el resumen del adulto: llamadas, cachés, detalle por alumno e históricos propios.

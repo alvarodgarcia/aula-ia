@@ -36,6 +36,17 @@ CONVERSATION_NOTICES = {
     "silence": "¿Sigues por ahí? Tómate tu tiempo. Cuando quieras, cuéntame qué estás pensando.",
     "noise": "Me cuesta distinguir tu voz del sonido de fondo. Busca un lugar más tranquilo o pulsa Finalizar conversación si prefieres seguir después.",
 }
+ENGLISH_GREETINGS = {
+    "lumo": "Hello! I'm Lumo. Let's discover English together!",
+    "nora": "Hello, I'm Nora. Let's practise English, one step at a time.",
+    "samir": "Hi, I'm Samir. What would you like to practise today?",
+}
+
+
+def greetings(locale="es-ES"):
+    return GREETINGS if locale == "es-ES" else ENGLISH_GREETINGS
+
+
 greeting_lock = asyncio.Lock()
 
 
@@ -55,7 +66,9 @@ def synthesis_key() -> str:
     return os.getenv("AZURE_SPEECH_KEY", "").strip() if provider() == "azure" else voice_api_key()
 
 
-def cache_identity(character: str) -> str:
+def cache_identity(character: str, locale: str = "es-ES") -> str:
+    if locale != "es-ES":
+        return f"{provider()}:{azure_voice.region() if provider() == 'azure' else MODEL}:{character}:{locale}:{STYLE_REVISION}"
     if provider() == "azure":
         return f"azure:{azure_voice.region()}:{azure_voice.VOICES[character]}:{STYLE_REVISION}"
     return f"openai:{MODEL}:{character}:{STYLE_REVISION}"
@@ -94,28 +107,30 @@ async def transcribe_class_audio(audio: bytes, extension: str, api_key: str) -> 
     return str(data.get("text") or "").strip()
 
 
-def voice_signature(profile_id: int, text: str) -> str:
+def voice_signature(profile_id: int, text: str, locale: str = "es-ES") -> str:
     text = voice_text(text)
-    if not text or len(text) > MAX_TEXT or not synthesis_ready():
+    if locale not in {"es-ES", "en-GB", "en-US"} or not text or len(text) > MAX_TEXT or not synthesis_ready():
         return ""
     message = f"aula-ia:tutor-voz:{profile_id}:{text}".encode()
+    if locale != "es-ES":
+        message += f":locale:{locale}".encode()
     return hmac.digest(os.environ["APP_SESSION_SECRET"].encode(), message, "sha256").hex()
 
 
-async def synthesize(text: str, character: str, age_group: str, api_key: str) -> bytes:
+async def synthesize(text: str, character: str, age_group: str, api_key: str, locale: str = "es-ES") -> bytes:
     if provider() == "azure":
-        return await azure_voice.synthesize(text, character, age_group, api_key)
+        return await azure_voice.synthesize(text, character, age_group, api_key, locale)
     if provider() != "openai":
         raise ValueError("Proveedor de voz no válido")
     event_id = accounting.begin("openai_voice", "openai", MODEL, "sintetizar", text_characters=len(text))
     try:
-        return await synthesize_openai(text, character, age_group, api_key, event_id)
+        return await synthesize_openai(text, character, age_group, api_key, event_id, locale)
     except Exception:
         accounting.fail(event_id)
         raise
 
 
-async def synthesize_openai(text: str, character: str, age_group: str, api_key: str, event_id: str) -> bytes:
+async def synthesize_openai(text: str, character: str, age_group: str, api_key: str, event_id: str, locale: str = "es-ES") -> bytes:
     voice, tone = VOICES[character]
     pace = {
         "early": "Usa un ritmo tranquilo y cercano, con pausas cortas entre ideas; mantén las palabras fluidas, sin separar sílabas ni adoptar voz de bebé.",
@@ -133,6 +148,8 @@ async def synthesize_openai(text: str, character: str, age_group: str, api_key: 
         "y las unidades. Lee los símbolos matemáticos por su nombre, con pausas naturales. "
         f"{tone} {pace}"
     )
+    if locale != "es-ES":
+        instructions = (f"Read only the supplied English text with a natural {'British' if locale == 'en-GB' else 'American'} English accent. Do not translate, add answers or comments. {tone} {pace}")
     event = {
         "type": "response.create",
         "response": {
@@ -174,16 +191,16 @@ async def synthesize_openai(text: str, character: str, age_group: str, api_key: 
     raise RuntimeError("El proveedor cerró la sesión de voz")
 
 
-async def greeting(text: str, character: str, age_group: str, api_key: str, cache: Path) -> bytes:
-    if text != GREETINGS[character]:
-        return await synthesize(text, character, age_group, api_key)
-    identity = hashlib.sha256(cache_identity(character).encode()).hexdigest()[:24]
+async def greeting(text: str, character: str, age_group: str, api_key: str, cache: Path, locale: str = "es-ES") -> bytes:
+    if text != greetings(locale)[character]:
+        return await synthesize(text, character, age_group, api_key, locale)
+    identity = hashlib.sha256(cache_identity(character, locale).encode()).hexdigest()[:24]
     path = cache / f"{identity}-{character}-{age_group}.wav"
     async with greeting_lock:
         if path.is_file():
-            accounting.cache_hit(provider(), MODEL if provider() == "openai" else azure_voice.VOICES[character])
+            accounting.cache_hit(provider(), MODEL if provider() == "openai" else azure_voice.selected_voice(character, locale))
             return path.read_bytes()
-        audio = await synthesize(text, character, age_group, api_key)
+        audio = await synthesize(text, character, age_group, api_key, locale)
         temporary = cache / f"{uuid4().hex}.tmp"
         try:
             cache.mkdir(exist_ok=True)

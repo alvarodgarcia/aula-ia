@@ -1,10 +1,12 @@
+{% set tutor_locale = english_locale|default("es-ES",true) %}
+{% set greetings = tutor_greetings_for(tutor_locale) %}
 {% set default_tutor = saved_tutor or ("lumo" if age_group == "early" else "nora" if age_group == "primary" else "samir") %}
 {% set in_exercise = exercise is defined %}
 {% set latest = tutor_history|last if tutor_history else none %}
 {% set is_hint = tutor_reply and tutor_reply.kind == "hint" %}
 <aside class="card tutor-card student-tutor" id="student-tutor" data-state="idle" data-profile="{{ profile.id }}"
        data-saved-character="{{ saved_tutor or '' }}" data-greet-on-entry="{{ 'yes' if greet_on_entry else 'no' }}"
-       data-voice-provider="{{ tutor_voice_provider_label() }}"
+       data-voice-provider="{{ tutor_voice_provider_label() }}" data-locale="{{ tutor_locale }}"
        data-rate="{{ 0.9 if age_group == 'early' else 0.96 if age_group == 'primary' else 1 }}">
   <details{% if not in_exercise or age_group != "teen" or tutor_reply %} open{% endif %}>
     <summary class="tutor-toggle">
@@ -24,7 +26,7 @@
       {% if in_exercise %}
       <div class="tutor-actions">
         <div data-tutor-voice-control hidden>
-          <button type="button" class="button button-secondary" data-tutor-read="exercise-prompt" data-tutor-signature="{{ tutor_voice_signature(profile.id, exercise.prompt) }}">Léeme el ejercicio</button>
+          <button type="button" class="button button-secondary" data-tutor-read="exercise-prompt" data-tutor-signature="{{ tutor_voice_signature(profile.id, exercise.prompt, tutor_locale) }}">Léeme el ejercicio</button>
         </div>
         {% if not exercise.solved %}
         <form method="post" action="/exercise/{{ exercise.id }}/hint{{ review_query }}">
@@ -58,6 +60,7 @@
         <div class="tutor-reply" data-conversation-result hidden>
           <strong>Tú</strong><p data-conversation-transcript style="white-space: pre-wrap"></p>
           <strong>Tutor</strong><p data-conversation-reply style="white-space: pre-wrap"></p>
+          <p class="privacy-note" data-conversation-help hidden></p>
           <a data-conversation-link hidden>Ver los ejercicios</a>
         </div>
       </section>
@@ -79,16 +82,20 @@
       <section class="tutor-reply" id="tutor-respuesta" aria-labelledby="tutor-reply-title">
         <h3 id="tutor-reply-title">{{ "Una pista" if is_hint else "Respuesta del tutor" }}</h3>
         {% set reply_text = latest.reply if latest else tutor_reply.text %}
-        <p id="tutor-reply-text">{{ reply_text }}</p>
+        {% if english_activity == 'listening' %}<details><summary>Ver el texto de escucha</summary>{% endif %}
+        <p id="tutor-reply-text" lang="{{ tutor_locale }}">{{ reply_text }}</p>
+        {% if english_activity == 'listening' %}</details>{% endif %}
         <div data-tutor-voice-control hidden>
-          <button type="button" class="button button-secondary" data-tutor-read="tutor-reply-text" data-tutor-signature="{{ tutor_voice_signature(profile.id, reply_text) }}">
+          <button type="button" class="button button-secondary" data-tutor-read="tutor-reply-text" data-tutor-signature="{{ tutor_voice_signature(profile.id, reply_text, tutor_locale) }}">
             {{ "Escuchar la pista" if is_hint else "Escuchar al tutor" }}
           </button>
         </div>
       </section>
       {% endif %}
+      {% if english_help %}<div class="privacy-note"><strong>Ayuda en español</strong><p id="english-help">{{ english_help }}</p><div data-tutor-voice-control hidden><button type="button" class="button button-secondary" data-tutor-read="english-help" data-tutor-locale="es-ES" data-tutor-signature="{{ tutor_voice_signature(profile.id, english_help) }}">Escuchar ayuda</button></div></div>{% endif %}
       <form method="post" action="{{ '/exercise/' ~ exercise.id ~ '/tutor' ~ review_query if in_exercise else '/mis-tareas/tutor' }}" class="stack" id="tutor-question">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% if english_mode %}<input type="hidden" name="study_mode" value="english"><input type="hidden" name="activity" value="{{ english_activity }}">{% endif %}
         <input type="hidden" id="tutor-selected-character" name="character" value="{{ default_tutor }}">
         <label>Tu pregunta<textarea name="question" rows="3" maxlength="1500" required placeholder="{{ 'No entiendo este paso…' if in_exercise else ('Explícame un tema de estas clases.' if class_review else 'Explícame este tema con un ejemplo…') }}"></textarea></label>
         <div class="tutor-question-actions">
@@ -104,7 +111,7 @@
             {% for character in ("lumo", "nora", "samir") %}
             <label>
               <input type="radio" name="tutor-character" value="{{ character }}" data-name="{{ character|capitalize }}"
-                     data-greeting="{{ tutor_greetings[character] }}" data-signature="{{ tutor_voice_signature(profile.id, tutor_greetings[character]) }}"{% if saved_tutor and character == default_tutor %} checked{% endif %}>
+                     data-greeting="{{ greetings[character] }}" data-signature="{{ tutor_voice_signature(profile.id, greetings[character], tutor_locale) }}"{% if saved_tutor and character == default_tutor %} checked{% endif %}>
               <span><img src="/static/tutor-{{ character }}.webp" alt="" width="40" height="40"> {{ character|capitalize }}</span>
             </label>
             {% endfor %}

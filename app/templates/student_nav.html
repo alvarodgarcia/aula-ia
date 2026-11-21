@@ -3,6 +3,7 @@
 {% set on_reviews = path.startswith(('/mis-tareas/repasos', '/mis-tareas/practica', '/mis-tareas/errores', '/packs/')) or review_pack or practice %}
 <nav class="student-nav" aria-label="Menú del alumno">
   <a href="/mis-tareas"{% if path == "/mis-tareas" %} aria-current="page"{% endif %}>Inicio</a>
+  <a href="/mis-tareas/ingles"{% if path == "/mis-tareas/ingles" %} aria-current="page"{% endif %}>Inglés</a>
   <a href="/mis-tareas/clase"{% if on_notes %} aria-current="page"{% endif %}>{{ "En clase" if age_group == "early" else "Apuntes" }}</a>
   <a href="/mis-tareas/repasos"{% if on_reviews %} aria-current="page"{% endif %}>{{ "Practicar" if age_group == "early" else "Repasos" }}</a>
 </nav>

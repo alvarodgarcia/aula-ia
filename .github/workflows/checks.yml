@@ -21,6 +21,8 @@ jobs:
         run: python tests/azure_voice_regression.py
       - name: Probar consumo, atribución y presupuestos
         run: python tests/consumption_regression.py
+      - name: Probar inglés, permisos, enseñanza y voces
+        run: python tests/english_regression.py
       - name: Probar conversación, ruido y silencio
         run: node tests/conversation_controls.mjs
       - name: Auditar dependencias

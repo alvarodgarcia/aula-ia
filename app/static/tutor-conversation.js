@@ -119,7 +119,7 @@
     discardRecording(active);
     phase(active, "notifying", text);
     tutor.dispatchEvent(new CustomEvent("tutor:read-conversation", { detail: {
-      text, signature: notice.dataset.signature, character: question.elements.character.value,
+      text, locale: "es-ES", signature: notice.dataset.signature, character: question.elements.character.value,
       audioContext: active.context,
       done: () => {
         if (session === active && active.phase === "notifying") listen(active, text, true);
@@ -251,6 +251,8 @@
     const character = question.elements.character.value;
     body.set("audio", audio, `turno.${extension}`);
     body.set("character", character);
+    if (question.elements.study_mode) body.set("study_mode", question.elements.study_mode.value);
+    if (question.elements.activity) body.set("activity", question.elements.activity.value);
     body.set("csrf_token", question.elements.csrf_token.value);
     if (controls.dataset.exerciseId) body.set("exercise_id", controls.dataset.exerciseId);
     const controller = new AbortController();
@@ -268,6 +270,8 @@
 
       transcript.textContent = data.transcript + (data.truncated ? " [Texto recortado]" : "");
       reply.textContent = data.reply;
+      const help = controls.querySelector("[data-conversation-help]");
+      if (help) { help.textContent = data.english_help || ""; help.hidden = !data.english_help; }
       link.hidden = !data.link;
       if (data.link) {
         link.setAttribute("href", data.link);
@@ -280,7 +284,7 @@
       active.aboveSince = null;
       phase(active, "replying", "Puedes interrumpirme hablando.");
       tutor.dispatchEvent(new CustomEvent("tutor:read-conversation", { detail: {
-        text: data.reply, signature: data.signature, character, audioContext: active.context,
+        text: data.reply, signature: data.signature, locale: data.locale || "es-ES", character, audioContext: active.context,
         done: message => {
           if (session !== active || active.phase !== "replying") return;
           if (active.aboveSince !== null && active.recording) {

@@ -123,7 +123,8 @@ document.addEventListener("DOMContentLoaded", () => {
         url = URL.createObjectURL(clip);
         audio.src = url;
         audio.hidden = false;
-        const label = response.headers.get("X-Aula-Voice-Provider") === "azure" ? "Azure Speech · España" : "OpenAI";
+        const locale = response.headers.get("X-Aula-Voice-Locale") || form.elements.locale?.value || "es-ES";
+        const label = (response.headers.get("X-Aula-Voice-Provider") === "azure" ? "Azure Speech" : "OpenAI") + ` · ${locale}`;
         status.textContent = `Muestra de ${character[0].toUpperCase() + character.slice(1)} · ${label}.`;
         await audio.play().catch(() => { status.textContent += " Pulsa reproducir para escucharla."; });
       } catch (error) {

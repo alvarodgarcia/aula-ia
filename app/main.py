@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
-from . import accounting, learning, voice
+from . import accounting, english, learning, voice
 from .security import SecurityMiddleware
 
 ROOT = Path(__file__).resolve().parent
@@ -118,6 +118,27 @@ class TutorPreference(Base):
     __tablename__ = "tutor_preferences"
     profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True)
     character: Mapped[str] = mapped_column(String(20))
+
+class EnglishPreference(Base):
+    __tablename__ = "english_preferences"
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    level: Mapped[str] = mapped_column(String(20), default="Por valorar")
+    locale: Mapped[str] = mapped_column(String(10), default="en-GB")
+    support: Mapped[str] = mapped_column(String(20), default="guided")
+    goal: Mapped[str] = mapped_column(String(300), default="")
+
+class EnglishTurn(Base):
+    __tablename__ = "english_turns"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), index=True)
+    activity: Mapped[str] = mapped_column(String(20))
+    question: Mapped[str] = mapped_column(Text)
+    reply: Mapped[str] = mapped_column(Text)
+    spanish_help: Mapped[str] = mapped_column(String(600), default="")
+    vocabulary: Mapped[str] = mapped_column(Text, default="[]")
+    feedback: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class StudyDocument(Base):
     __tablename__ = "study_documents"
@@ -343,6 +364,7 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 templates = Jinja2Templates(directory=ROOT / "templates")
 templates.env.globals["tutor_voice_signature"] = voice.voice_signature
 templates.env.globals["tutor_greetings"] = voice.GREETINGS
+templates.env.globals["tutor_greetings_for"] = voice.greetings
 templates.env.globals["tutor_conversation_notices"] = voice.CONVERSATION_NOTICES
 templates.env.globals["tutor_voice_provider_label"] = voice.provider_label
 templates.env.globals["tutor_conversation_available"] = lambda: bool(voice.voice_api_key())
@@ -859,9 +881,15 @@ def exercise_choices(db: Session, exercise_id: int) -> list[str]:
 async def student_tutor_answer(
     db: Session, profile: Profile, question: str, exercise: Exercise | None = None, *, create: bool = False,
     character: str = "", review_notes: list[ClassNote] | None = None, review_turns: list[int] | None = None,
-    spoken: bool = False,
+    spoken: bool = False, english_mode: bool = False, activity: str = "conversation",
 ) -> tuple[str, int | None, int | None]:
+    english_mode = english_mode or (exercise is not None and english.is_subject(exercise.subject))
+    config = english_config(db, profile.id) if english_mode else None
+    if config and not config["enabled"]:
+        raise StudyRequestBlocked("El adulto ha pausado el modo Inglés.")
     history = tutor_history(db, profile.id) if review_notes is None else scoped_tutor_history(db, profile.id, review_turns or [])
+    if config:
+        history = list(reversed(db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(6)).all()))
     context = {
         "edad": profile.age, "etapa": profile.stage, "ciclo": profile.cycle, "curso": profile.course,
         "fecha_actual": learning.school_day(),
@@ -905,6 +933,9 @@ async def student_tutor_answer(
         "su solución de referencia. Un ejemplo didáctico resuelto puede aparecer en reply con exercise=null. "
         + feedback_for_age(profile.age)
     )
+    if config:
+        system = system.replace("Responde en español conversacional, natural al leerse en voz alta.", "Responde en inglés natural adecuado al nivel.")
+        system += english.instruction(config, activity)
     if spoken:
         system += (
             " Estás hablando por voz. Empieza por la explicación útil y trata una idea cada vez. "
@@ -926,11 +957,14 @@ async def student_tutor_answer(
         except ValueError as exc:
             raise TutorResponseError("Formato inesperado en la respuesta del tutor") from exc
         check_study_decision(db, payload, result)
+        help_text, vocabulary, feedback = english.bounded_learning(payload, config) if config else ("", [], "")
         data = payload.get("exercise")
+        if config and isinstance(data, dict):
+            data = {**data, "subject": "Inglés"}
         new_exercise = tutor_exercise(profile.id, data) if data is not None or create else None
         value = payload.get("reply")
         reply = value[:TUTOR_REPLY_LIMIT].strip() if isinstance(value, str) else ""
-        candidate: dict[str, Any] = {"respuesta": reply}
+        candidate: dict[str, Any] = {"respuesta": reply, "ayuda": help_text, "vocabulario": vocabulary, "observacion": feedback}
         if new_exercise is not None:
             candidate["practica"] = {
                 "asignatura": new_exercise.subject, "enunciado": new_exercise.prompt,
@@ -961,13 +995,15 @@ async def student_tutor_answer(
             if source:
                 new_exercise.subject = source.subject
                 new_exercise.source_reference = note_source(source)
-        reply = f"He preparado un ejercicio de {new_exercise.subject} sobre {new_exercise.topic}."
+        reply = "Your exercise is ready. Try it yourself!" if config else f"He preparado un ejercicio de {new_exercise.subject} sobre {new_exercise.topic}."
     exchange = None
     if reply:
         db.scalar(select(Profile.id).where(Profile.id == profile.id).with_for_update())
         if new_exercise is not None:
             db.add(new_exercise)
-        exchange = TutorExchange(profile_id=profile.id, question=question, reply=reply)
+        exchange = (EnglishTurn(profile_id=profile.id, activity=activity, question=question, reply=reply,
+                                spanish_help=help_text, vocabulary=json.dumps(vocabulary, ensure_ascii=False), feedback=feedback)
+                    if config else TutorExchange(profile_id=profile.id, question=question, reply=reply))
         db.add(exchange)
         db.flush()
         if new_exercise is not None:
@@ -1278,6 +1314,8 @@ async def prepare_exam_review(
     if instructions:
         context["instrucciones"] = instructions
         context["cantidad"] = count
+    if notes and all(english.is_subject(n.subject) for n in notes):
+        system += english.instruction(english_config(db, profile.id), "reading", tutor=False)
     result = await ai_request(system, json.dumps(context, ensure_ascii=False), "repaso_examen", json_mode=True)
     payload = parse_json(result["text"])
     check_study_decision(db, payload, result)
@@ -1392,6 +1430,8 @@ async def assign_review(db: Session, exercise: Exercise) -> Exercise:
         "curso": exercise.profile.course, "etapa": exercise.profile.stage,
         "asignatura": exercise.subject, "tema": exercise.topic, "enunciado": exercise.prompt[:3000],
     }
+    if english.is_subject(exercise.subject):
+        system += english.instruction(english_config(db, exercise.profile_id), "grammar", tutor=False)
     result = await ai_request(system, json.dumps(original, ensure_ascii=False), "generar_repaso", True)
     review = tutor_exercise(exercise.profile_id, parse_json(result["text"]), mode="review_ai")
     db.add(review)
@@ -1514,6 +1554,50 @@ def student_login(
         request.session.clear()
         request.session.update(student_id=access.profile_id, student_version=access.session_version, greet_tutor=True)
         return RedirectResponse("/mis-tareas", status_code=303)
+
+def english_config(db: Session, profile_id: int) -> dict:
+    return english.settings(db.get(EnglishPreference, profile_id))
+
+@app.post("/profiles/{profile_id}/ingles")
+def configure_english(profile_id: int, request: Request, csrf_token: str = Form(...),
+                      enabled: bool = Form(False), level: str = Form(...), locale: str = Form(...),
+                      support: str = Form(...), goal: str = Form("", max_length=300)) -> Response:
+    redirect = login_redirect(request)
+    if redirect:
+        return redirect
+    check_csrf(request, csrf_token)
+    if level not in english.LEVELS or locale not in english.LOCALES or support not in english.SUPPORT:
+        raise HTTPException(status_code=422, detail="Configuración de inglés no válida")
+    with db_session() as db:
+        if db.get(Profile, profile_id) is None:
+            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+        preference = db.get(EnglishPreference, profile_id)
+        if preference is None:
+            preference = EnglishPreference(profile_id=profile_id)
+            db.add(preference)
+        preference.enabled, preference.level, preference.locale = enabled, level, locale
+        preference.support, preference.goal = support, goal.strip()
+        audit_event(db, profile_id, "Configuración de inglés", f"{level} · {locale} · {support}", "habilitado" if enabled else "pausado")
+        db.commit()
+    request.session["notice"] = "Configuración de inglés guardada. El nivel es orientativo."
+    return RedirectResponse(f"/?alumno={profile_id}#alumno-{profile_id}", status_code=303)
+
+@app.get("/mis-tareas/ingles")
+def english_page(request: Request, activity: str = "conversation") -> Response:
+    with db_session() as db:
+        profile = student_profile(request, db)
+        if profile is None or authenticated(request):
+            return RedirectResponse("/login/alumno", status_code=303)
+        if activity not in english.ACTIVITIES:
+            raise HTTPException(status_code=400, detail="Actividad no válida")
+        config = english_config(db, profile.id)
+        turns = db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(20)).all()
+        counts = dict(db.execute(select(EnglishTurn.activity, func.count()).where(EnglishTurn.profile_id == profile.id).group_by(EnglishTurn.activity)).all())
+        return student_view(request, "english.html", profile, english_mode=True, english_config=config,
+            english_locale=config["locale"], english_activity=activity, activities=english.ACTIVITIES,
+            starter=english.STARTERS[activity], english_turns=turns, english_counts=counts, english_vocabulary={t.id: ", ".join(json.loads(t.vocabulary)) for t in turns},
+            tutor_history=list(reversed(turns[:6])), english_help=turns[0].spanish_help if turns else "",
+            saved_tutor=tutor_character(db, profile.id), greet_on_entry=False)
 
 @app.get("/mis-tareas", response_class=HTMLResponse)
 def student_tasks(request: Request, historial: str = "") -> Response:
@@ -2026,7 +2110,12 @@ async def student_review(exercise_id: int, request: Request, csrf_token: str = F
 async def ask_profile_tutor(
     request: Request, question: str = Form(...), csrf_token: str = Form(...), intent: str = Form("chat"),
     character: str = Form(""), contexto: str = Form(""), note_id: int | None = Form(None),
+    study_mode: str = Form(""), activity: str = Form("conversation"),
 ) -> RedirectResponse:
+    english_mode = study_mode == "english"
+    if english_mode and activity not in english.ACTIVITIES:
+        raise HTTPException(status_code=400, detail="Actividad no válida")
+    location = f"/mis-tareas/ingles?activity={activity}" if english_mode else "/mis-tareas#student-tutor"
     if authenticated(request):
         return RedirectResponse("/", status_code=303)
     with db_session() as db:
@@ -2050,14 +2139,14 @@ async def ask_profile_tutor(
             }
         elif contexto == "nota":
             request.session.pop("class_review", None)
-        review_scope = request.session.get("class_review")
+        review_scope = None if english_mode else request.session.get("class_review")
         if not question:
             request.session["notice"] = "Escribe una pregunta para el tutor."
         else:
             entry = start_student_request(db, profile.id, "Tutor", question)
             if not entry.uses_quota:
                 request.session["notice"] = entry.reply
-                return RedirectResponse("/mis-tareas#student-tutor", status_code=303)
+                return RedirectResponse(location, status_code=303)
             try:
                 blocked = obvious_study_block(question)
                 if blocked:
@@ -2082,10 +2171,10 @@ async def ask_profile_tutor(
                             )
                             finish_student_request(db, entry, "apoyo", f"Práctica de {count} ejercicios · pack {pack.id}")
                             return RedirectResponse(f"/packs/{pack.id}", status_code=303)
-                        return RedirectResponse("/mis-tareas#student-tutor", status_code=303)
+                        return RedirectResponse(location, status_code=303)
                 reply, exercise_id, exchange_id = await student_tutor_answer(
                     db, profile, question, create=intent == "exercise", character=character,
-                    review_notes=review_notes, review_turns=review_scope["turns"] if review_scope else None,
+                    review_notes=review_notes, review_turns=review_scope["turns"] if review_scope else None, english_mode=english_mode, activity=activity,
                 )
                 if review_scope and exchange_id is not None:
                     request.session["class_review"] = {
@@ -2112,12 +2201,13 @@ async def ask_profile_tutor(
                 log_tutor_failure(exc)
                 finish_student_request(db, entry, "error")
                 request.session["notice"] = failure_notice(exc, "No se pudo contactar con el tutor. Vuelve a intentarlo.")
-    return RedirectResponse("/mis-tareas#student-tutor", status_code=303)
+    return RedirectResponse(location, status_code=303)
 
 @app.post("/tutor/conversacion")
 async def tutor_conversation_turn(
     request: Request, csrf_token: str = Form(...), audio: UploadFile = File(...),
     character: str = Form(...), exercise_id: int | None = Form(None),
+    study_mode: str = Form(""), activity: str = Form("conversation"),
 ) -> JSONResponse:
     def message(text: str, status: int) -> JSONResponse:
         return JSONResponse({"error": text}, status_code=status, headers={"Cache-Control": "no-store"})
@@ -2149,6 +2239,11 @@ async def tutor_conversation_turn(
         finally:
             await audio.close()
 
+        english_mode = study_mode == "english" or (exercise is not None and english.is_subject(exercise.subject))
+        config = english_config(db, profile.id) if english_mode else None
+        if config and (not config["enabled"] or activity not in english.ACTIVITIES):
+            return message("El modo Inglés está pausado o la actividad no es válida.", 403)
+        locale = config["locale"] if config else "es-ES"
         detail = f"Ejercicio {exercise.id} · " if exercise is not None else ""
         entry = start_student_request(db, profile.id, "Conversación por voz", f"{detail}Turno de voz")
         if not entry.uses_quota:
@@ -2171,7 +2266,7 @@ async def tutor_conversation_turn(
         entry.detail = (detail + transcript).replace("\x00", "")
         db.commit()
 
-        scope = request.session.get("class_review") if exercise is None else None
+        scope = request.session.get("class_review") if exercise is None and not english_mode else None
         link = ""
         outcome = "apoyo"
         try:
@@ -2192,7 +2287,7 @@ async def tutor_conversation_turn(
             else:
                 reply, created_id, exchange_id = await student_tutor_answer(
                     db, profile, transcript, exercise, character=character,
-                    review_notes=notes, review_turns=scope["turns"] if scope else None, spoken=True,
+                    review_notes=notes, review_turns=scope["turns"] if scope else None, spoken=True, english_mode=english_mode, activity=activity,
                 )
                 if scope and exchange_id is not None:
                     request.session["class_review"] = {
@@ -2213,9 +2308,12 @@ async def tutor_conversation_turn(
             finish_student_request(db, entry, "error")
             return message("No se pudo preparar la respuesta. Puedes preguntar otra vez o escribirla.", 502)
         finish_student_request(db, entry, outcome, reply)
+        response_locale = locale if outcome == "apoyo" else "es-ES"
+        latest_english = db.scalar(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(1)) if english_mode and outcome == "apoyo" else None
         return JSONResponse({
             "transcript": transcript, "truncated": len(text) > TUTOR_QUESTION_LIMIT, "reply": reply,
-            "signature": voice.voice_signature(profile.id, reply), "link": link,
+            "signature": voice.voice_signature(profile.id, reply, response_locale), "locale": response_locale, "link": link,
+            "english_help": latest_english.spanish_help if latest_english else "",
         }, headers={"Cache-Control": "no-store"})
 
 @app.post("/tutor/personaje")
@@ -2236,7 +2334,7 @@ def choose_tutor(request: Request, character: str = Form(...), csrf_token: str =
         db.commit()
     return JSONResponse({"character": character})
 
-async def generated_voice(db: Session, profile: Profile, text: str, character: str, *, preview: bool = False) -> Response:
+async def generated_voice(db: Session, profile: Profile, text: str, character: str, *, preview: bool = False, locale: str = "es-ES") -> Response:
     profile_id = profile.id
     age_group = student_age_group(profile.age)
     policy = db.get(StudentTutorPolicy, profile_id)
@@ -2245,9 +2343,9 @@ async def generated_voice(db: Session, profile: Profile, text: str, character: s
         raise HTTPException(status_code=429, detail="El adulto ha pausado la IA de este perfil.")
     if not voice.synthesis_ready():
         raise HTTPException(status_code=503, detail="Configura el proveedor de voz en el servidor antes de probarlo.")
-    identity = voice.cache_identity(character)
+    identity = voice.cache_identity(character, locale)
     cache_key = hashlib.sha256(f"{profile_id}:{character}:{age_group}:{identity}:{text}".encode()).hexdigest()
-    headers = {"Cache-Control": "no-store", "X-Aula-Voice-Provider": voice.provider()}
+    headers = {"Cache-Control": "no-store", "X-Aula-Voice-Provider": voice.provider(), "X-Aula-Voice-Locale": locale}
     clip = db.get(VoiceClip, cache_key)
     if clip is not None:
         accounting.cache_hit(voice.provider(), identity)
@@ -2261,13 +2359,13 @@ async def generated_voice(db: Session, profile: Profile, text: str, character: s
             if not reserve_security_limit(db, "azure-voice-rate", "family", 18, 60):
                 raise HTTPException(status_code=429, detail="Espera un minuto antes de generar más voces de prueba.")
             month = datetime.now(timezone.utc).strftime("%Y-%m")
-            amount = voice.azure_voice.reserved_characters(text, character, age_group)
+            amount = voice.azure_voice.reserved_characters(text, character, age_group, locale)
             if not reserve_security_limit(db, "azure-voice-month", month, 400000, 40 * 86400, amount):
                 raise HTTPException(status_code=429, detail="Se ha alcanzado el límite mensual local de voz Azure. Puedes seguir leyendo y escribiendo.")
         entry = audit_event(db, profile_id, "Prueba voz adulto" if preview else "Lectura en voz", text, "recibida")
         db.commit()
         try:
-            audio = await voice.greeting(text, character, age_group, voice.synthesis_key(), DATA_DIR / "tutor-greetings")
+            audio = await voice.greeting(text, character, age_group, voice.synthesis_key(), DATA_DIR / "tutor-greetings", locale)
         except Exception as exc:
             logger.warning("Tutor IA: Falló la síntesis de voz (%s)", type(exc).__name__)
             finish_student_request(db, entry, "error de voz")
@@ -2283,19 +2381,21 @@ async def generated_voice(db: Session, profile: Profile, text: str, character: s
 
 @app.post("/admin/voz/prueba")
 async def preview_voice(request: Request, profile_id: int = Form(...), character: str = Form(...),
-                        csrf_token: str = Form(...)) -> Response:
+                        csrf_token: str = Form(...), locale: str = Form("es-ES")) -> Response:
     if not authenticated(request):
         return JSONResponse({"error": "Solo el adulto puede probar la voz desde este panel."}, status_code=403)
     check_csrf(request, csrf_token)
-    if character not in voice.VOICES:
-        raise HTTPException(status_code=400, detail="Personaje no disponible")
+    if character not in voice.VOICES or locale not in {"es-ES", "en-GB", "en-US"}:
+        raise HTTPException(status_code=400, detail="Personaje o idioma no disponible")
     with db_session() as db:
         profile = db.get(Profile, profile_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="Perfil no encontrado")
         text = f"Hola, soy {character.capitalize()}. Vamos a practicar juntos. Fíjate en este ejercicio: cinco veces doce. ¿Qué paso darías primero?"
+        if locale != "es-ES":
+            text = f"Hello, I am {character.capitalize()}. Let us practise English together. What do you enjoy doing after school?"
         try:
-            return await generated_voice(db, profile, text, character, preview=True)
+            return await generated_voice(db, profile, text, character, preview=True, locale=locale)
         except HTTPException as exc:
             return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
 
@@ -2303,7 +2403,7 @@ async def preview_voice(request: Request, profile_id: int = Form(...), character
 @app.post("/tutor/voz")
 async def tutor_voice(
     request: Request, text: str = Form(..., max_length=voice.MAX_TEXT + 20),
-    signature: str = Form(..., max_length=64), character: str = Form(...),
+    signature: str = Form(..., max_length=64), character: str = Form(...), locale: str = Form("es-ES"),
     csrf_token: str = Form(...),
 ) -> Response:
     with db_session() as db:
@@ -2312,13 +2412,13 @@ async def tutor_voice(
             raise HTTPException(status_code=403, detail="Solo para alumnos")
         check_csrf(request, csrf_token)
         text = voice.voice_text(text)
-        expected = voice.voice_signature(profile_id, text)
+        expected = voice.voice_signature(profile_id, text, locale)
         if not expected or not hmac.compare_digest(signature.encode(), expected.encode()):
             raise HTTPException(status_code=403, detail="Lectura no válida para este perfil")
         profile = db.get(Profile, profile_id)
         if profile is None or character not in voice.VOICES:
             raise HTTPException(status_code=400, detail="Personaje no disponible")
-        return await generated_voice(db, profile, text, character)
+        return await generated_voice(db, profile, text, character, locale=locale)
 
 @app.post("/logout")
 def logout(request: Request, csrf_token: str = Form(...)) -> RedirectResponse:
@@ -2483,6 +2583,9 @@ def render_adult_dashboard(
     return render(request, "index.html", {
         "consumption_summary": accounting.report("mes"),
         "voice_ready": voice.synthesis_ready(),
+        "english_profiles": {p.id: english_config(db, p.id) for p in profiles},
+        "english_recent": {p.id: db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == p.id).order_by(EnglishTurn.id.desc()).limit(5)).all() for p in profiles},
+        "english_levels": english.LEVELS, "english_locales": english.LOCALES, "english_support": english.SUPPORT,
         "profiles": profiles, "documents": documents, "exercises": exercises, "packs": packs,
         "upload_accept": UPLOAD_ACCEPT, "photo_accept": PHOTO_ACCEPT, "max_material_files": MAX_MATERIAL_FILES,
         "student_profile_ids": student_profile_ids, "login_codes": login_codes,
@@ -2940,6 +3043,8 @@ async def create_exercise(
             "cantidad": count, "dificultad": difficulty,
             "texto_material": document.extracted_text[:48000 if document.is_bundle else 12000] if document else "",
         }
+        if english.is_subject(subject):
+            system += english.instruction(english_config(db, profile.id), "grammar", tutor=False)
         try:
             result = await ai_request(
                 system, json.dumps(context, ensure_ascii=False),
@@ -3044,6 +3149,7 @@ def exercise_page(exercise_id: int, request: Request, repaso: int | None = None)
             "choices": exercise_choices(db, exercise.id),
             "review_pack": review_pack, "next_review": next_review,
             "review_kind": content.get("kind") if review_pack else None,
+            "english_locale": english_config(db, exercise.profile_id)["locale"] if english.is_subject(exercise.subject) else "es-ES",
             "show_solution": exercise.solved and not student,
             "tutor_reply": tutor_reply if tutor_reply and tutor_reply["exercise_id"] == exercise.id else None,
             "notice": get_notice(request),
@@ -3120,6 +3226,8 @@ async def submit_answer(
             f"Solución de referencia: {exercise.worked_solution}\nIntento número: {number}.\n"
             f"Respuesta del alumno (texto JSON): {json.dumps(answer[:5000], ensure_ascii=False)}"
         )
+        if english.is_subject(exercise.subject):
+            system += english.instruction(english_config(db, exercise.profile_id), "writing", tutor=False)
         try:
             result = await ai_request(system, user, "corregir_respuesta", True)
             grade = parse_json(result["text"])

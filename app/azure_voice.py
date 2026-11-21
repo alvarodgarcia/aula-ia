@@ -10,6 +10,18 @@ from . import accounting
 
 
 VOICES = {"lumo": "es-ES-ElviraNeural", "nora": "es-ES-XimenaNeural", "samir": "es-ES-AlvaroNeural"}
+ENGLISH_VOICES = {
+    "en-GB": {"lumo": "en-GB-LibbyNeural", "nora": "en-GB-SoniaNeural", "samir": "en-GB-RyanNeural"},
+    "en-US": {"lumo": "en-US-JennyNeural", "nora": "en-US-AriaNeural", "samir": "en-US-GuyNeural"},
+}
+
+
+def selected_voice(character: str, locale: str = "es-ES") -> str:
+    if locale not in {"es-ES", "en-GB", "en-US"}:
+        raise ValueError("Idioma de voz no válido")
+    return (VOICES if locale == "es-ES" else ENGLISH_VOICES[locale])[character]
+
+
 MAX_AUDIO_BYTES = 24000 * 2 * 100 + 4096
 
 
@@ -27,24 +39,24 @@ def configured() -> bool:
         return False
 
 
-def ssml(text: str, character: str, age_group: str) -> str:
+def ssml(text: str, character: str, age_group: str, locale: str = "es-ES") -> str:
     speed = {"early": "-8%", "primary": "-3%", "teen": "0%"}[age_group]
     pitch = "+2%" if character == "lumo" else "0%"
-    return (f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="es-ES">'
-            f'<voice name="{VOICES[character]}"><prosody rate="{speed}" pitch="{pitch}">'
+    return (f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{locale}">'
+            f'<voice name="{selected_voice(character, locale)}"><prosody rate="{speed}" pitch="{pitch}">'
             f'{escape(text)}</prosody></voice></speak>')
 
 
-def reserved_characters(text: str, character: str, age_group: str) -> int:
+def reserved_characters(text: str, character: str, age_group: str, locale: str = "es-ES") -> int:
     # Conservative upper estimate, including markup and double-width/Unicode characters.
-    return len(ssml(text, character, age_group).encode("utf-16-le"))
+    return len(ssml(text, character, age_group, locale).encode("utf-16-le"))
 
 
-async def synthesize(text: str, character: str, age_group: str, key: str) -> bytes:
-    event_id = accounting.begin("azure_voice", "azure", VOICES[character], "sintetizar",
-                                text_characters=len(text), azure_units=reserved_characters(text, character, age_group))
+async def synthesize(text: str, character: str, age_group: str, key: str, locale: str = "es-ES") -> bytes:
+    event_id = accounting.begin("azure_voice", "azure", selected_voice(character, locale), "sintetizar",
+                                text_characters=len(text), azure_units=reserved_characters(text, character, age_group, locale))
     try:
-        audio = await synthesize_audio(text, character, age_group, key)
+        audio = await synthesize_audio(text, character, age_group, key, locale)
         with wave.open(io.BytesIO(audio), "rb") as wav:
             duration = wav.getnframes() / wav.getframerate()
         accounting.finish(event_id, audio_seconds=duration)
@@ -54,14 +66,14 @@ async def synthesize(text: str, character: str, age_group: str, key: str) -> byt
         raise
 
 
-async def synthesize_audio(text: str, character: str, age_group: str, key: str) -> bytes:
+async def synthesize_audio(text: str, character: str, age_group: str, key: str, locale: str = "es-ES") -> bytes:
     endpoint = f"https://{region()}.tts.speech.microsoft.com/cognitiveservices/v1"
     headers = {"Ocp-Apim-Subscription-Key": key, "Content-Type": "application/ssml+xml",
                "X-Microsoft-OutputFormat": "riff-24khz-16bit-mono-pcm", "User-Agent": "AulaIA"}
     output = bytearray()
     async with httpx.AsyncClient(timeout=40, follow_redirects=False) as client:
         async with client.stream("POST", endpoint, headers=headers,
-                                 content=ssml(text, character, age_group).encode()) as response:
+                                 content=ssml(text, character, age_group, locale).encode()) as response:
             response.raise_for_status()
             async for chunk in response.aiter_bytes():
                 output.extend(chunk)

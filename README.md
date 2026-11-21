@@ -2,7 +2,7 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión actual: 1.4.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.4.1.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
 
 ![Acceso a Aula IA](docs/screenshots/acceso.png)
 

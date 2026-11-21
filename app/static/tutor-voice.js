@@ -305,9 +305,11 @@
       playBrowser(playback, text.trim(), character);
     });
   });
-  if (tutor.dataset.autoRead === "yes") {
+  if (tutor.dataset.autoRead === "yes" || tutor.dataset.autoTarget) {
+    const target = tutor.dataset.autoTarget || "tutor-reply-text";
     tutor.dataset.autoRead = "no";
-    const button = tutor.querySelector("[data-tutor-read=tutor-reply-text]");
+    tutor.dataset.autoTarget = "";
+    const button = [...tutor.querySelectorAll("[data-tutor-read]")].find(b => b.dataset.tutorRead === target);
     if (button) { button.closest("[data-tutor-voice-control]").hidden = false; button.click(); }
   }
   if (savedCharacter && tutor.dataset.greetOnEntry === "yes" && !greeting.closest("[data-tutor-voice-control]").hidden) {

@@ -123,6 +123,58 @@ class EnglishTests(unittest.TestCase):
         self.assertIn('correct boolean',self.calls[0]['messages'][0]['content'])
         self.assertNotIn('incluye además learning',self.calls[0]['messages'][0]['content'])
         self.assertIn('data-locale="en-US"',self.student.get(f'/exercise/{eid}').text)
+    def listening_provider(self, request):
+        body=json.loads(request.content)
+        self.calls.append(body)
+        content={'decision':'apoyo'} if 'Actúa como revisor' in body['messages'][0]['content'] else {
+            'decision':'apoyo','reply':'Try this exercise.','exercise':{'subject':'English','topic':'Listening',
+            'prompt':'Listen: Alex went to the park. Where did Alex go? Write your answer below.',
+            'answer_key':'the park','worked_solution':'Alex went to the park.', 'hints':[]}}
+        return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps(content)}}],'usage':{'prompt_tokens':100,'completion_tokens':30}})
+
+    def test_listening_creation_speaks_instructions_and_entry_once(self):
+        self.config(locale='en-US')
+        with self.f.mock(self.listening_provider):
+            response=self.student.post('/mis-tareas/tutor',headers={'Accept':'application/json'},data={
+                'csrf_token':self.token,'study_mode':'english','activity':'listening','intent':'exercise','question':'Create a listening exercise.'})
+        self.assertEqual(response.status_code,200)
+        data=response.json()
+        self.assertIn('Listen: Alex',data['reply']);self.assertIn('Write your answer below',data['reply'])
+        self.assertNotIn('Alex went to the park.',data['reply'].split('Listen:')[0])
+        self.assertEqual(data['locale'],'en-US')
+        self.assertEqual(data['signature'],main.voice.voice_signature(self.pid,data['reply'],'en-US'))
+        with main.db_session() as db:
+            exercise=db.scalar(main.select(main.Exercise))
+            self.assertEqual(db.get(main.EnglishExerciseContext,exercise.id).activity,'listening')
+        page=self.student.get(data['link']).text
+        self.assertIn('data-auto-target="exercise-listening-intro"',page)
+        self.assertIn('data-locale="en-US"',page);self.assertIn('name="answer"',page)
+        self.assertNotIn('data-auto-target="exercise-listening-intro"',self.student.get(data['link']).text)
+        self.assertNotIn('data-auto-target="exercise-listening-intro"',self.admin.get(data['link']).text)
+        self.assertEqual(len(self.calls),2)  # Opening/refreshing never asks the model again.
+        if os.getenv('AULA_PREVIEW_DIR'):
+            Path(os.environ['AULA_PREVIEW_DIR'],'escucha-ejercicio.html').write_text(page,encoding='utf-8')
+
+    def test_listening_post_redirect_preserves_activity_and_pause(self):
+        with self.f.mock(self.listening_provider):response=self.ask(activity='listening',intent='exercise')
+        link=response.headers['location']
+        with self.f.mock(self.provider):self.student.post(link+'/tutor',data={'csrf_token':self.token,'question':'Help me understand the instructions.'})
+        self.assertIn('Habilidad: Escucha',self.calls[-2]['messages'][0]['content'])
+        self.config(enabled='false')
+        page=self.student.get(link).text
+        self.assertNotIn('data-auto-target="exercise-listening-intro"',page)
+
+    def test_listening_rejects_oversized_prompt_before_saving(self):
+        def oversized(request):
+            response=self.listening_provider(request)
+            data=response.json();content=json.loads(data['choices'][0]['message']['content'])
+            if content.get('exercise'):content['exercise']['prompt']='x'*1201
+            data['choices'][0]['message']['content']=json.dumps(content)
+            return httpx.Response(200,json=data)
+        with self.f.mock(oversized):response=self.ask(activity='listening',intent='exercise')
+        with main.db_session() as db:self.assertIsNone(db.scalar(main.select(main.Exercise)))
+        self.assertEqual(response.status_code,303)
+
     def test_new_english_exercise_keeps_answer_field_and_subject(self):
         def provider(request):
             body=json.loads(request.content)

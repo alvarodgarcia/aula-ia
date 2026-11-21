@@ -1,5 +1,11 @@
 # Cambios de Aula IA
 
+## 1.4.1 · 2026-11-22
+
+- Los ejercicios nuevos de Escucha conservan su actividad: el tutor presenta en inglés el enunciado y sus instrucciones al crearlos y al abrirlos por primera vez en la sesión, sin revelar la solución.
+- Reproducción automática con detener/repetir y alternativa manual del navegador. Las recargas no repiten el audio ni generan nuevas consultas al tutor.
+- Contexto de Escucha conservado al pedir ayuda dentro del ejercicio, límites de longitud para la locución y respeto de la pausa de Inglés. Tabla nueva `english_exercise_contexts` sin modificar columnas existentes.
+
 ## 1.4.0 · 2026-11-22
 
 - Práctica de pronunciación básica con Azure Speech: frases guiadas, precisión, fluidez, lectura completada y resultados por palabra. Sonidos de referencia solo cuando Azure los devuelve para en-US. Sin prosodia ni cambio de plan del recurso.

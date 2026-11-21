@@ -141,6 +141,11 @@ class EnglishTurn(Base):
     feedback: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+class EnglishExerciseContext(Base):
+    __tablename__ = "english_exercise_contexts"
+    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id", ondelete="CASCADE"), primary_key=True)
+    activity: Mapped[str] = mapped_column(String(20))
+
 class StudyDocument(Base):
     __tablename__ = "study_documents"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -887,6 +892,8 @@ async def student_tutor_answer(
     spoken: bool = False, english_mode: bool = False, activity: str = "conversation",
 ) -> tuple[str, int | None, int | None]:
     english_mode = english_mode or (exercise is not None and english.is_subject(exercise.subject))
+    if exercise is not None and (saved_context := db.get(EnglishExerciseContext, exercise.id)):
+        activity = saved_context.activity
     config = english_config(db, profile.id) if english_mode else None
     if config and not config["enabled"]:
         raise StudyRequestBlocked("El adulto ha pausado el modo Inglés.")
@@ -965,6 +972,8 @@ async def student_tutor_answer(
         if config and isinstance(data, dict):
             data = {**data, "subject": "Inglés"}
         new_exercise = tutor_exercise(profile.id, data) if data is not None or create else None
+        if config and activity == "listening" and new_exercise is not None and len(new_exercise.prompt) > 1200:
+            raise TutorResponseError("El ejercicio de escucha es demasiado largo. Pide una práctica más breve.")
         value = payload.get("reply")
         reply = value[:TUTOR_REPLY_LIMIT].strip() if isinstance(value, str) else ""
         candidate: dict[str, Any] = {"respuesta": reply, "ayuda": help_text, "vocabulario": vocabulary, "observacion": feedback}
@@ -998,7 +1007,8 @@ async def student_tutor_answer(
             if source:
                 new_exercise.subject = source.subject
                 new_exercise.source_reference = note_source(source)
-        reply = "Your exercise is ready. Try it yourself!" if config else f"He preparado un ejercicio de {new_exercise.subject} sobre {new_exercise.topic}."
+        reply = (english.listening_introduction(new_exercise.prompt) if config and activity == "listening" else
+                 "Your exercise is ready. Try it yourself!" if config else f"He preparado un ejercicio de {new_exercise.subject} sobre {new_exercise.topic}.")
     exchange = None
     if reply:
         db.scalar(select(Profile.id).where(Profile.id == profile.id).with_for_update())
@@ -1011,6 +1021,8 @@ async def student_tutor_answer(
         db.flush()
         if new_exercise is not None:
             save_choices(db, new_exercise, data.get("choices"))
+            if config:
+                db.add(EnglishExerciseContext(exercise_id=new_exercise.id, activity=activity))
         retained = (
             select(TutorExchange.id).where(TutorExchange.profile_id == profile.id)
             .order_by(TutorExchange.id.desc()).limit(TUTOR_HISTORY_LIMIT)
@@ -2272,7 +2284,7 @@ async def ask_profile_tutor(
                         "signature": voice.voice_signature(profile.id, reply, config["locale"]),
                         "help": turn.spanish_help if turn else "", "help_signature": voice.voice_signature(profile.id, turn.spanish_help) if turn else "",
                         "count": count, "activity": activity, "link": f"/exercise/{exercise_id}" if exercise_id else ""}, headers={"Cache-Control": "no-store"})
-                if english_mode and activity == "listening" and reply and exchange_id:
+                if english_mode and activity == "listening" and reply and exchange_id and exercise_id is None:
                     request.session['english_autoplay'] = exchange_id
                 if exercise_id is not None:
                     return RedirectResponse(f"/exercise/{exercise_id}", status_code=303)
@@ -3223,6 +3235,13 @@ def exercise_page(exercise_id: int, request: Request, repaso: int | None = None)
         attempts = db.query(Attempt).filter_by(exercise_id=exercise.id).order_by(Attempt.created_at.desc()).limit(10).all()
         tutor_reply = request.session.pop("tutor_reply", None)
         student = not authenticated(request)
+        study_context = db.get(EnglishExerciseContext, exercise.id)
+        listening_exercise = bool(student and study_context and study_context.activity == "listening"
+                                  and english.is_subject(exercise.subject) and english_config(db, exercise.profile_id)["enabled"])
+        seen = request.session.get("listening_exercises_seen", [])
+        autoplay_exercise = listening_exercise and not exercise.solved and exercise.id not in seen and not tutor_reply
+        if autoplay_exercise:
+            request.session["listening_exercises_seen"] = (seen + [exercise.id])[-20:]
         review_pack = db.get(StudyPack, repaso) if repaso is not None else None
         next_review = None
         if review_pack and review_pack.assigned and review_pack.profile_id == exercise.profile_id:
@@ -3240,6 +3259,9 @@ def exercise_page(exercise_id: int, request: Request, repaso: int | None = None)
             review_pack = None
         return render(request, "exercise.html", {
             "exercise": exercise, "profile": exercise.profile, "attempts": attempts,
+            "listening_exercise": listening_exercise,
+            "listening_introduction": english.listening_introduction(exercise.prompt) if listening_exercise else "",
+            "autoplay_target": "exercise-listening-intro" if autoplay_exercise else "",
             "age_group": student_age_group(exercise.profile.age) if student else "",
             "saved_tutor": tutor_character(db, exercise.profile_id) if student else "",
             "practice": practice_for_exercise(db, exercise) if student else None,

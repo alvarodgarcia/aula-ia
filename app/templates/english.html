@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block page_styles %}<link rel="stylesheet" href="/static/student.css?v=11"><script defer src="/static/tutor-voice.js?v=12"></script><script defer src="/static/tutor-conversation.js?v=4"></script><script defer src="/static/english-listening.js?v=1"></script><script defer src="/static/pronunciation.js?v=1"></script>{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="/static/student.css?v=11"><script defer src="/static/tutor-voice.js?v=13"></script><script defer src="/static/tutor-conversation.js?v=4"></script><script defer src="/static/english-listening.js?v=1"></script><script defer src="/static/pronunciation.js?v=1"></script>{% endblock %}
 {% block body_attributes %} class="student student--{{ age_group }}"{% endblock %}
 {% block content %}
 <header class="hero admin-hero"><div><span class="eyebrow">Tu profesor particular</span><h1>Let's practise English</h1><p>Habla, escucha, lee y escribe a tu ritmo con tu tutor.</p><p>{{ english_config.level }} · {{ 'Británico' if english_locale == 'en-GB' else 'Americano' }} · {{ 'Con ayuda en español' if english_config.support == 'guided' else 'Solo inglés' }}</p></div></header>

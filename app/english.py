@@ -19,6 +19,11 @@ STARTERS = {
 }
 
 
+def listening_introduction(prompt):
+    # Only the reviewed prompt is spoken; never the answer key, hints or worked solution.
+    return "Let's practise listening. Listen carefully to the exercise and its instructions.\n\n" + prompt
+
+
 def is_subject(subject):
     name = ''.join(c for c in unicodedata.normalize('NFD', subject.casefold()) if not unicodedata.combining(c))
     return bool(re.search(r'\b(ingles|english)\b', name))
@@ -57,6 +62,10 @@ def instruction(config, activity='conversation', tutor=True):
     )
 
     if tutor:
+        if activity == 'listening':
+            result += (' En Escucha, presenta la práctica y explica lo que debe hacer en inglés, '
+                       'con instrucciones orales breves. Si creas exercise, incluye el texto de escucha y '
+                       'las instrucciones completas en prompt, hasta 1200 caracteres, sin respuestas ni solución. ')
         return result
     return result.split('Escribe reply')[0] + (
         ' Enunciados y ejemplos en inglés del nivel indicado. '

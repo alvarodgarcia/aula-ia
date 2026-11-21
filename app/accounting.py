@@ -186,7 +186,7 @@ def report(period, profile_filter=0, profile_ids=()):
         def row(key, store):
             return store.setdefault(key, {"profile_id": key, "calls": 0, "input": 0, "output": 0, "text_tokens": 0,
                 "unknown": 0, "azure_chars": 0, "azure_units": 0, "seconds": 0.0, "audio_unknown": 0,
-                "cache": 0, "cached_tokens": 0, "errors": 0, "reserved": 0, "text_cost": 0.0, "cost_unknown": 0, "adult_calls": 0})
+                "cache": 0, "cached_tokens": 0, "errors": 0, "reserved": 0, "text_cost": 0.0, "cost_unknown": 0, "adult_calls": 0, "pronunciation_seconds": 0.0, "pronunciation_calls": 0})
         for e in events:
             for r in (row(e.profile_id, rows), row(e.profile_id, provider_rows.setdefault(e.provider, {}))):
                 if e.kind == "voice_cache":
@@ -208,6 +208,9 @@ def report(period, profile_filter=0, profile_ids=()):
                 if e.kind == "azure_voice":
                     r["azure_chars"] += e.text_characters
                     r["azure_units"] += e.azure_units
+                if e.kind == "pronunciation":
+                    r["pronunciation_calls"] += 1
+                    r["pronunciation_seconds"] += e.audio_seconds or 0
                 if e.kind == "transcription":
                     if e.audio_seconds is None:
                         r["audio_unknown"] += 1
@@ -223,7 +226,7 @@ def report(period, profile_filter=0, profile_ids=()):
         def totalize(group):
             return {k: sum(r[k] for r in group.values()) for k in (
                 "calls", "input", "output", "text_tokens", "unknown", "azure_chars", "seconds", "audio_unknown",
-                "cache", "cached_tokens", "errors", "reserved", "text_cost", "cost_unknown")}
+                "cache", "cached_tokens", "errors", "reserved", "text_cost", "cost_unknown", "pronunciation_seconds", "pronunciation_calls")}
         totals = totalize(rows)
         providers = {name: {"totals": totalize(group), "rows": group,
                            "recent": [e for e in events if e.provider == name][:25],

@@ -51,7 +51,7 @@ Si el proveedor falla, el respaldo del dispositivo exige el mismo idioma exacto:
 
 Cada firma y caché distingue el idioma. El alumno no puede cambiar el idioma firmado ni la configuración de otro perfil. Se mantienen los límites diarios compartidos, presupuestos de texto, límites de transcripción y límite mensual global de voz Azure. El monitor sigue separando OpenAI de Azure; aprender inglés no crea cuotas gratuitas adicionales.
 
-**Pronunciación:** no se puntúa. Se transcribe el audio para conversar; corregir el texto transcrito no demuestra qué sonidos pronunció el alumno. Azure Pronunciation Assessment sería una integración adicional, con su propia evaluación técnica y de costes.
+**Desde 1.4.0**, el adulto puede habilitar [Pronunciación básica](PRONUNCIACION_Y_ESCUCHA.md) con Azure y límites propios. La conversación habitual sigue siendo una transcripción, sin evaluación fonética. En Escucha, el tutor reproduce automáticamente el nuevo turno tras proponer la práctica, sujeto a las restricciones de audio del navegador.
 
 Referencias: [descriptores MCER](https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-descriptors), [voces Azure](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support), [evaluación específica de pronunciación](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/how-to-pronunciation-assessment).
 

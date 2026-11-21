@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
-from . import accounting, english, learning, voice
+from . import accounting, english, learning, pronunciation, voice
 from .security import SecurityMiddleware
 
 ROOT = Path(__file__).resolve().parent
@@ -45,6 +45,7 @@ MAX_DAILY_TUTOR_LIMIT = 100
 PDF_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="aula-pdf")
 MATERIAL_SLOT = BoundedSemaphore(1)
 VOICE_SLOT = BoundedSemaphore(1)
+PRONUNCIATION_SLOT = BoundedSemaphore(1)
 EDUCATION = {
     "Infantil": {"Segundo ciclo": ["3 años", "4 años", "5 años"]},
     "Primaria": {"1.º ciclo": ["1.º", "2.º"], "2.º ciclo": ["3.º", "4.º"], "3.º ciclo": ["5.º", "6.º"]},
@@ -308,6 +309,7 @@ class AIUsage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 accounting.configure(engine, AIUsage)
+pronunciation.configure(engine)
 
 
 async def consumption_scope(request: Request):
@@ -383,6 +385,7 @@ def startup() -> None:
         raise RuntimeError("La publicación requiere APP_COOKIE_SECURE=true y APP_ALLOWED_HOSTS con el dominio autorizado")
     Base.metadata.create_all(engine)
     accounting.Base.metadata.create_all(engine)
+    pronunciation.Base.metadata.create_all(engine)
     with db_session() as db:
         missing = db.scalars(select(StudentAccess.profile_id).where(
             StudentAccess.profile_id.not_in(select(StudentLoginCode.profile_id)),
@@ -1583,21 +1586,100 @@ def configure_english(profile_id: int, request: Request, csrf_token: str = Form(
     return RedirectResponse(f"/?alumno={profile_id}#alumno-{profile_id}", status_code=303)
 
 @app.get("/mis-tareas/ingles")
-def english_page(request: Request, activity: str = "conversation") -> Response:
+def english_page(request: Request, activity: str = "conversation", phrase: str = "") -> Response:
     with db_session() as db:
         profile = student_profile(request, db)
         if profile is None or authenticated(request):
             return RedirectResponse("/login/alumno", status_code=303)
-        if activity not in english.ACTIVITIES:
+        if activity not in {*english.ACTIVITIES, "pronunciation"}:
             raise HTTPException(status_code=400, detail="Actividad no válida")
         config = english_config(db, profile.id)
         turns = db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(20)).all()
         counts = dict(db.execute(select(EnglishTurn.activity, func.count()).where(EnglishTurn.profile_id == profile.id).group_by(EnglishTurn.activity)).all())
+        phrase_id = phrase if phrase in pronunciation.PHRASES else ({'Por valorar': 'hello', 'Pre-A1': 'hello', 'A1': 'school', 'A2': 'weekend', 'B1': 'plans', 'B2': 'opinion'}.get(config['level'], 'choice'))
+        autoplay_id = request.session.pop('english_autoplay', None)
+        autoplay = activity == 'listening' and bool(turns) and turns[0].id == autoplay_id
+        pronunciation_data = pronunciation.overview(profile.id) if activity == 'pronunciation' else None
         return student_view(request, "english.html", profile, english_mode=True, english_config=config,
             english_locale=config["locale"], english_activity=activity, activities=english.ACTIVITIES,
-            starter=english.STARTERS[activity], english_turns=turns, english_counts=counts, english_vocabulary={t.id: ", ".join(json.loads(t.vocabulary)) for t in turns},
+            pronunciation=pronunciation_data, pronunciation_ready=voice.azure_voice.configured(),
+            phrase_id=phrase_id, phrase=pronunciation.PHRASES[phrase_id], phrases=pronunciation.PHRASES, autoplay_listening=autoplay,
+            starter=english.STARTERS.get(activity,""), english_turns=turns, english_counts=counts, english_vocabulary={t.id: ", ".join(json.loads(t.vocabulary)) for t in turns},
             tutor_history=list(reversed(turns[:6])), english_help=turns[0].spanish_help if turns else "",
             saved_tutor=tutor_character(db, profile.id), greet_on_entry=False)
+
+@app.post("/pronunciacion/limites")
+def configure_pronunciation(request: Request, csrf_token: str = Form(...), scope_id: int = Form(..., ge=0, le=2147483647),
+                            enabled: bool = Form(False), monthly_minutes: int = Form(..., ge=1, le=240),
+                            daily_attempts: int = Form(10, ge=1, le=30)) -> Response:
+    redirect = login_redirect(request)
+    if redirect:
+        return redirect
+    check_csrf(request, csrf_token)
+    with db_session() as db:
+        if scope_id and db.get(Profile, scope_id) is None:
+            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    pronunciation.save_policy(scope_id, enabled, monthly_minutes * 60, daily_attempts)
+    request.session['notice'] = 'Límites de pronunciación guardados. No se ha cambiado el plan de Azure ni activado prosodia.'
+    return RedirectResponse('/#pronunciacion' if not scope_id else f'/?alumno={scope_id}#alumno-{scope_id}', status_code=303)
+
+@app.post("/mis-tareas/ingles/pronunciacion/evaluar")
+async def assess_pronunciation(request: Request, csrf_token: str = Form(...), phrase_id: str = Form(...), audio: UploadFile = File(...)) -> Response:
+    def error(text, status):
+        return JSONResponse({'error': text}, status_code=status, headers={'Cache-Control': 'no-store'})
+    try:
+        with db_session() as db:
+            profile = student_profile(request, db)
+            if profile is None or authenticated(request):
+                return error('Entra con tu perfil de alumno.', 403)
+            check_csrf(request, csrf_token)
+            config = english_config(db, profile.id)
+            profile_id = profile.id
+            if not config['enabled']:
+                return error('El adulto ha pausado el modo Inglés.', 403)
+        if phrase_id not in pronunciation.PHRASES:
+            return error('Selecciona una de las frases de práctica.', 400)
+        if not voice.azure_voice.configured():
+            return error('Falta configurar Azure Speech en el servidor.', 503)
+        content = await audio.read(pronunciation.MAX_BYTES + 1)
+        try:
+            content, seconds = pronunciation.canonical_audio(content)
+        except ValueError as exc:
+            return error(str(exc), 422)
+    finally:
+        await audio.close()
+    if not PRONUNCIATION_SLOT.acquire(blocking=False):
+        return error('Se está evaluando otra grabación. Espera un momento.', 429)
+    try:
+        with db_session() as db:
+            entry = start_student_request(db, profile_id, 'Pronunciación en inglés', pronunciation.PHRASES[phrase_id])
+            if not entry.uses_quota:
+                return error(entry.reply, 429)
+            try:
+                attempt_id = pronunciation.reserve(profile_id, config['locale'], pronunciation.PHRASES[phrase_id], seconds)
+            except pronunciation.LimitReached as exc:
+                entry.uses_quota = False
+                finish_student_request(db, entry, 'límite de pronunciación', str(exc))
+                return error(str(exc), 429)
+            event_id = None
+            try:
+                event_id = accounting.begin('pronunciation', 'azure', 'pronunciation-basic', 'evaluar_pronunciacion')
+                result = await pronunciation.assess(content, config['locale'], pronunciation.PHRASES[phrase_id])
+                accounting.finish(event_id, audio_seconds=seconds)
+                pronunciation.finish(attempt_id, result)
+                finish_student_request(db, entry, 'evaluada', 'Evaluación orientativa guardada; sin prosodia.')
+                return JSONResponse({'result': result, 'attempt_id': attempt_id,
+                    'used': pronunciation.overview(profile_id)['child_used']}, headers={'Cache-Control': 'no-store'})
+            except Exception as exc:
+                if event_id:
+                    accounting.fail(event_id)
+                pronunciation.finish(attempt_id)
+                finish_student_request(db, entry, 'error de evaluación')
+                logger.warning('Pronunciación Azure no disponible (%s)', type(exc).__name__)
+                detail = str(exc) if isinstance(exc, ValueError) else 'Azure no pudo evaluar el audio. Revisa disponibilidad, clave y cuota. La reserva local se conserva.'
+                return error(detail, 502)
+    finally:
+        PRONUNCIATION_SLOT.release()
 
 @app.get("/mis-tareas", response_class=HTMLResponse)
 def student_tasks(request: Request, historial: str = "") -> Response:
@@ -2113,6 +2195,7 @@ async def ask_profile_tutor(
     study_mode: str = Form(""), activity: str = Form("conversation"),
 ) -> RedirectResponse:
     english_mode = study_mode == "english"
+    wants_json = english_mode and "application/json" in request.headers.get("accept", "")
     if english_mode and activity not in english.ACTIVITIES:
         raise HTTPException(status_code=400, detail="Actividad no válida")
     location = f"/mis-tareas/ingles?activity={activity}" if english_mode else "/mis-tareas#student-tutor"
@@ -2146,7 +2229,7 @@ async def ask_profile_tutor(
             entry = start_student_request(db, profile.id, "Tutor", question)
             if not entry.uses_quota:
                 request.session["notice"] = entry.reply
-                return RedirectResponse(location, status_code=303)
+                return JSONResponse({"error": entry.reply}, status_code=429) if wants_json else RedirectResponse(location, status_code=303)
             try:
                 blocked = obvious_study_block(question)
                 if blocked:
@@ -2181,6 +2264,16 @@ async def ask_profile_tutor(
                         **review_scope, "turns": (review_scope["turns"] + [exchange_id])[-TUTOR_HISTORY_LIMIT:],
                     }
                 finish_student_request(db, entry, "apoyo" if reply else "sin respuesta", reply)
+                if wants_json and reply:
+                    turn = db.get(EnglishTurn, exchange_id) if exchange_id else None
+                    config = english_config(db, profile.id)
+                    count = db.scalar(select(func.count()).select_from(EnglishTurn).where(EnglishTurn.profile_id == profile.id, EnglishTurn.activity == activity))
+                    return JSONResponse({"reply": reply, "locale": config["locale"],
+                        "signature": voice.voice_signature(profile.id, reply, config["locale"]),
+                        "help": turn.spanish_help if turn else "", "help_signature": voice.voice_signature(profile.id, turn.spanish_help) if turn else "",
+                        "count": count, "activity": activity, "link": f"/exercise/{exercise_id}" if exercise_id else ""}, headers={"Cache-Control": "no-store"})
+                if english_mode and activity == "listening" and reply and exchange_id:
+                    request.session['english_autoplay'] = exchange_id
                 if exercise_id is not None:
                     return RedirectResponse(f"/exercise/{exercise_id}", status_code=303)
                 if not reply:
@@ -2201,6 +2294,8 @@ async def ask_profile_tutor(
                 log_tutor_failure(exc)
                 finish_student_request(db, entry, "error")
                 request.session["notice"] = failure_notice(exc, "No se pudo contactar con el tutor. Vuelve a intentarlo.")
+    if wants_json:
+        return JSONResponse({"error": get_notice(request) or "No se pudo preparar la práctica."}, status_code=422, headers={"Cache-Control": "no-store"})
     return RedirectResponse(location, status_code=303)
 
 @app.post("/tutor/conversacion")
@@ -2462,6 +2557,7 @@ def consumption_page(request: Request, periodo: str = "mes", perfil: int = 0) ->
         return render(request, "consumption.html", {
             "profiles": profiles, "report": data, "daily": daily, "daily_limits": limits,
             "default_daily_limit": DEFAULT_DAILY_TUTOR_LIMIT, "azure_reserved": azure_reserved,
+            "pronunciation_family": pronunciation.overview(),
             "notice": get_notice(request),
         })
 
@@ -2584,6 +2680,8 @@ def render_adult_dashboard(
         "consumption_summary": accounting.report("mes"),
         "voice_ready": voice.synthesis_ready(),
         "english_profiles": {p.id: english_config(db, p.id) for p in profiles},
+        "pronunciation_family": pronunciation.overview(),
+        "pronunciation_profiles": {p.id: pronunciation.overview(p.id) for p in profiles},
         "english_recent": {p.id: db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == p.id).order_by(EnglishTurn.id.desc()).limit(5)).all() for p in profiles},
         "english_levels": english.LEVELS, "english_locales": english.LOCALES, "english_support": english.SUPPORT,
         "profiles": profiles, "documents": documents, "exercises": exercises, "packs": packs,

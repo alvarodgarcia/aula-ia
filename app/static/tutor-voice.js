@@ -179,7 +179,7 @@
     };
     utterance.onerror = () => {
       if (current === playback) resetReading(
-        playback.button === greeting ? "Pulsa «Escuchar saludo» para oírlo." : "No se ha podido reproducir la voz.",
+        playback.button === greeting ? "Pulsa «Escuchar saludo» para oírlo." : "Pulsa Escuchar al tutor para iniciar el audio.",
       );
     };
     speech.speak(utterance);
@@ -305,6 +305,11 @@
       playBrowser(playback, text.trim(), character);
     });
   });
+  if (tutor.dataset.autoRead === "yes") {
+    tutor.dataset.autoRead = "no";
+    const button = tutor.querySelector("[data-tutor-read=tutor-reply-text]");
+    if (button) { button.closest("[data-tutor-voice-control]").hidden = false; button.click(); }
+  }
   if (savedCharacter && tutor.dataset.greetOnEntry === "yes" && !greeting.closest("[data-tutor-voice-control]").hidden) {
     greeting.click();
   }

@@ -1,5 +1,13 @@
 # Cambios de Aula IA
 
+## 1.4.0 · 2026-11-22
+
+- Práctica de pronunciación básica con Azure Speech: frases guiadas, precisión, fluidez, lectura completada y resultados por palabra. Sonidos de referencia solo cuando Azure los devuelve para en-US. Sin prosodia ni cambio de plan del recurso.
+- Grabación de hasta 20 segundos, conversión a WAV PCM en el navegador y validación real de formato/duración en el servidor. No se almacena el audio ni se duplica su transcripción en OpenAI.
+- Activación del adulto y límites por familia/alumno. Reserva máxima familiar de 240 minutos mensuales; inicialmente 60 minutos y 10 intentos diarios por alumno. Las reservas inciertas se conservan ante errores.
+- Escucha inicia el audio inglés al proponer una práctica, sin recargar la página cuando hay JavaScript. Permite detener y repetir; si el navegador bloquea el audio, ofrece reproducción manual. La recarga posterior no vuelve a iniciar el mismo turno.
+- Monitor Azure con segundos de evaluación separados de caracteres de voz, historial de resultados y supervisión del adulto. Dos tablas nuevas sin alterar las columnas existentes.
+
 ## 1.3.0 · 2026-11-21
 
 - Modo Inglés con conversación, gramática, vocabulario, lectura, escucha y escritura sobre el tutor y personaje existentes.

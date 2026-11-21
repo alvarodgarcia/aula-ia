@@ -24,6 +24,7 @@ def csrf(response):
 
 class ResourceSecurityTests(unittest.TestCase):
     def setUp(self):
+        main.pronunciation.Base.metadata.drop_all(main.engine)
         main.accounting.Base.metadata.drop_all(main.engine)
         main.Base.metadata.drop_all(main.engine)
         self.client = TestClient(main.app, follow_redirects=False)

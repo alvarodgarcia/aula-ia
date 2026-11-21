@@ -28,6 +28,12 @@
   </form>
   {% else %}<p>Crea un perfil para probar la voz con un ritmo adecuado a su edad.</p>{% endif %}
 </details>
+<section class="card section-block" id="pronunciacion"><h2>Pronunciación · Azure básico</h2>
+<p>Prácticas de lectura de hasta 20 segundos. Usa el recurso Speech ya configurado; no cambia su plan ni activa prosodia. Actívalo tras comprobar tu recurso F0. Las reservas locales no muestran el saldo de Azure.</p>
+<p>{{ pronunciation_family.family_used }} / {{ pronunciation_family.family.monthly_seconds }} segundos reservados este mes UTC para la familia.</p>
+{% if pronunciation_family.family_used >= pronunciation_family.family.monthly_seconds * 0.8 %}<p class="usage-alert">Se ha utilizado al menos el 80 % de la reserva mensual local.</p>{% endif %}
+{% with pronunciation_scope=0, pronunciation_policy=pronunciation_family.family %}{% include "pronunciation_limits.html" %}{% endwith %}
+</section>
 <div class="two-column">
   <section class="card"><div class="section-heading"><h2>Crear perfil</h2></div>
     <form method="post" action="/profiles" class="form-grid">
@@ -100,6 +106,11 @@
         <button class="button button-secondary">Guardar inglés</button>
       </form>
       {% if english_recent[p.id] %}<details><summary>Últimas prácticas de inglés</summary><ol>{% for turn in english_recent[p.id] %}<li>{{ turn.created_at.strftime("%d/%m") }} · {{ turn.activity }}<p>{{ turn.feedback }}</p></li>{% endfor %}</ol></details>{% endif %}
+      <h3>Pronunciación de inglés</h3>
+      {% set pronunciation_profile=pronunciation_profiles[p.id] %}
+      <p>{{ pronunciation_profile.child_used }} / {{ pronunciation_profile.child.monthly_seconds }} segundos reservados este mes. La activación familiar y el límite general de IA también se aplican.</p>
+      {% with pronunciation_scope=p.id, pronunciation_policy=pronunciation_profile.child %}{% include "pronunciation_limits.html" %}{% endwith %}
+      {% if pronunciation_profile.recent %}<details><summary>Lecturas evaluadas y reservas</summary><ol>{% for attempt in pronunciation_profile.recent %}<li>{{ attempt.date.strftime('%d/%m %H:%M') }} · {{ attempt.status }} · {{ attempt.seconds }} segundos<p>{{ attempt.reference }}</p>{% if attempt.status == 'ok' %}<p>Precisión: {{ attempt.result.accuracy }} / 100</p>{% endif %}</li>{% endfor %}</ol></details>{% endif %}
       <h3>Límite diario de IA</h3>
       {% with limit_profile=p, daily_limit=limit, from_dashboard=true %}{% include "student_limit_form.html" %}{% endwith %}
       <p><a href="/profiles/{{ p.id }}/semana">Ver resumen semanal</a></p>

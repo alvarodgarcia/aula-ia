@@ -31,7 +31,9 @@ class SecurityMiddleware:
             return
 
         limit = 128 * 1024
-        if path in {"/documents", "/mis-tareas/clase/material"}:
+        if path == "/mis-tareas/ingles/pronunciacion/evaluar":
+            limit = 700 * 1024
+        elif path in {"/documents", "/mis-tareas/clase/material"}:
             limit = 66 * 1024 * 1024
         elif path in {"/tutor/conversacion", "/mis-tareas/clase/transcribir"}:
             limit = 9 * 1024 * 1024

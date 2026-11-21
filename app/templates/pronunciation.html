@@ -1,0 +1,16 @@
+<section class="pronunciation-practice stack" data-pronunciation>
+  <h2>Escucha, lee y mejora tu pronunciación</h2>
+  <p class="privacy-note">Esta grabación se envía a Azure para evaluar la lectura. No se guarda el audio en Aula IA; el adulto puede revisar la frase y los resultados. Máximo 20 segundos. Evaluación orientativa, sin prosodia ni diagnóstico.</p>
+  {% if not pronunciation_ready %}<p class="notice">El adulto debe configurar Azure Speech en el servidor.</p>
+  {% elif not pronunciation.family.enabled or not pronunciation.child.enabled %}<p class="notice">El adulto debe habilitar pronunciación en el panel familiar y en tu perfil.</p>
+  {% else %}
+  <form method="get" action="/mis-tareas/ingles"><input type="hidden" name="activity" value="pronunciation"><label>Frase de práctica<select name="phrase">{% for key,text in phrases.items() %}<option value="{{ key }}"{% if key == phrase_id %} selected{% endif %}>{{ text[:65] }}</option>{% endfor %}</select></label><button class="button button-secondary">Elegir frase</button></form>
+  <p id="pronunciation-reference" class="pronunciation-reference" lang="{{ english_locale }}">{{ phrase }}</p>
+  <div data-tutor-voice-control hidden><button type="button" class="button button-secondary" data-tutor-read="pronunciation-reference" data-tutor-signature="{{ tutor_voice_signature(profile.id, phrase, english_locale) }}">Escuchar ejemplo</button></div>
+  <form data-pronunciation-form><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="phrase_id" value="{{ phrase_id }}"><button type="button" class="button button-primary" data-pronunciation-record>Grabar mi lectura</button><button type="button" class="button button-secondary" data-pronunciation-cancel hidden>Cancelar</button></form>
+  <p role="status" data-pronunciation-status>Escucha el ejemplo y graba cuando quieras. El micrófono solo se abre al pulsar Grabar.</p>
+  <section class="pronunciation-result" data-pronunciation-result hidden aria-live="polite"></section>
+  {% endif %}
+  <p class="source-ref">Reservas locales este mes: familia {{ pronunciation.family_used // 60 }} / {{ pronunciation.family.monthly_seconds // 60 }} min · tú {{ pronunciation.child_used }} / {{ pronunciation.child.monthly_seconds }} segundos. Hoy {{ pronunciation.daily_used }} / {{ pronunciation.child.daily_attempts }} intentos. También se aplica tu límite general de IA. Las llamadas fallidas conservan la reserva.</p>
+  {% if pronunciation.recent %}<details><summary>Mis últimas lecturas</summary><ol>{% for attempt in pronunciation.recent %}<li><strong>{{ attempt.date.strftime('%d/%m %H:%M') }}</strong> · {{ 'Evaluada' if attempt.status == 'ok' else 'Pendiente' if attempt.status == 'pending' else 'No evaluada' }}<p lang="{{ english_locale }}">{{ attempt.reference }}</p>{% if attempt.status == 'ok' %}<p>Precisión: {{ attempt.result.accuracy }} / 100 · fluidez: {{ attempt.result.fluency if attempt.result.fluency is not none else 'No disponible' }}</p>{% endif %}</li>{% endfor %}</ol></details>{% endif %}
+</section>

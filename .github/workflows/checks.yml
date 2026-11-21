@@ -23,6 +23,8 @@ jobs:
         run: python tests/consumption_regression.py
       - name: Probar inglés, permisos, enseñanza y voces
         run: python tests/english_regression.py
+      - name: Probar pronunciación, audio, cuotas y escucha dinámica
+        run: python tests/pronunciation_regression.py
       - name: Probar conversación, ruido y silencio
         run: node tests/conversation_controls.mjs
       - name: Auditar dependencias

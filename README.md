@@ -2,7 +2,7 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión actual: 1.3.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.4.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
 
 ![Acceso a Aula IA](docs/screenshots/acceso.png)
 
@@ -11,6 +11,8 @@ Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso
 Modo de inglés por alumno, con nivel orientativo, conversación, lectura, escucha, escritura, gramática y vocabulario. Voces británicas o americanas y ayuda opcional en castellano. [Uso e instalación](docs/MODO_INGLES.md).
 
 ![Modo Inglés con datos ficticios](docs/screenshots/ingles-alumno.png)
+
+[Pronunciación básica y escucha dinámica](docs/PRONUNCIACION_Y_ESCUCHA.md): activación del adulto, grabaciones de hasta 20 segundos y límites locales compartidos.
 
 ## Para el alumno
 

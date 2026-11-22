@@ -1,4 +1,4 @@
-# Inglés especializado · Aula IA 1.3.0
+# Inglés especializado · Aula IA 1.4.2
 
 El modo Inglés usa el personaje y el acceso del alumno que ya existen. Se añade a las demás materias, sin otra cuenta ni otra web.
 
@@ -23,7 +23,7 @@ No es una prueba oficial de nivel ni una certificación. Se aceptan variantes br
 
 Entrar en **Inglés** desde su menú y elegir Conversación, Gramática, Vocabulario, Lectura, Escucha o Escritura. «Empezar una práctica» pide una propuesta al tutor; también puede escribir una duda propia, pedir un ejercicio o conversar por el micrófono.
 
-En conversación se proponen turnos breves. En escritura se espera el intento del alumno y se le guía para autocorregirse. Para lectura y escucha se pide material original adecuado al nivel. En escucha, usar «Escuchar al tutor» antes de abrir «Ver el texto de escucha». Se trata de escucha generada por IA, no de un examen con audio externo validado.
+En conversación se proponen turnos breves. En escritura se espera el intento del alumno y se le guía para autocorregirse. Para lectura y escucha se pide material original adecuado al nivel. En Escucha, el tutor empieza a hablar en inglés al proponer una práctica. Puede detenerse o repetirse; el texto está plegado en «Ver el texto de escucha». Al crear un ejercicio de Escucha presenta el enunciado y las instrucciones; al abrirlo por primera vez en la sesión inicia también la presentación. Esto se aplica a ejercicios nuevos desde 1.4.1. Si el navegador restringe el audio, se mantiene el control manual. Se trata de escucha generada por IA, no de un examen con audio externo validado.
 
 La respuesta de práctica está en inglés. Cuando el adulto habilita la ayuda, aparece aparte en español y puede escucharse con voz española. Durante una conversación la ayuda también se muestra en pantalla; el turno inglés se reproduce automáticamente mediante los controles existentes. Los avisos de silencio o ruido siguen siendo españoles.
 
@@ -57,22 +57,22 @@ Referencias: [descriptores MCER](https://www.coe.int/en/web/common-european-fram
 
 ## Instalar el parche acumulativo
 
-Subir `Aula_IA_parche_v1.3.0.tar.gz` a `/tmp` del servidor y ejecutar:
+Subir `Aula_IA_parche_v1.4.2.tar.gz` a `/tmp` del servidor y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.3.0-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.4.2-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.3.0.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.4.2.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web
 ```
 
-Se crean `english_preferences` y `english_turns` al arrancar. No se alteran columnas anteriores ni se sobrescribe `.env`, las claves o la región de Azure. Conservar la copia de seguridad; no restaurar una base anterior sin revisar las actividades posteriores. Un retorno al código anterior puede dejar las tablas nuevas sin utilizar.
+Al arrancar se crean, si faltan, las tablas del modo Inglés, los contextos de ejercicios de Escucha y las tablas de pronunciación y consumo de las versiones acumuladas. No se alteran columnas anteriores ni se sobrescribe `.env`, las claves o la región de Azure. Conservar la copia de seguridad; no restaurar una base anterior sin revisar las actividades posteriores. Un retorno al código anterior puede dejar las tablas nuevas sin utilizar.
 
 Después de instalar, configurar un perfil, probar una voz inglesa y hacer una práctica corta. Verificar el idioma, ayuda, historial y atribución en consumo. La prueba en servidor y la calidad de las voces/modelo reales no quedan certificadas por las comprobaciones locales.
 

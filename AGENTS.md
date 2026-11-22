@@ -11,3 +11,18 @@ El usuario autorizó probar Azure Speech F0 para corregir el acento usando voces
 - Incluir pruebas pertinentes y describir las comprobaciones realmente realizadas y sus límites. No afirmar que una revisión local certifica el servidor publicado.
 - Mantener las capturas sin datos reales de alumnos. Nunca incluir `.env`, credenciales, bases de datos, adjuntos reales ni copias.
 - Una mejora posterior requiere una nueva etiqueta y entrega; no sobrescribir las versiones publicadas. La autorización para publicar se determina por la petición vigente del usuario.
+
+## Funcionamiento que debe conservarse
+
+- El tutor es un profesor particular: explica, guía y propone práctica sin sustituir el razonamiento ni las lecturas del alumno. Conservar supervisión, historial y límites del adulto.
+- Inglés usa el perfil y personaje existentes. La variedad en-GB/en-US, nivel y ayuda española se configuran por alumno. Mantener las firmas y cachés de voz por idioma.
+- En Escucha, la nueva respuesta se reproduce tras solicitar la práctica. Los ejercicios creados en esta actividad guardan `EnglishExerciseContext`; su primera apertura en la sesión inicia la presentación inglesa, con detener/repetir y alternativa manual si el navegador bloquea el audio. No reproducir respuestas de referencia ni soluciones. No inferir la actividad de ejercicios antiguos.
+- Pronunciación requiere activación familiar y permiso del alumno; audios de hasta 20 segundos, sin guardar la grabación, sin prosodia adicional y sin cambiar el plan Azure. Mantener reservas conservadoras y consumo de evaluación separado de caracteres de voz y tokens OpenAI.
+- El menú del alumno contiene Inicio, Inglés, Apuntes/En clase y Repasos/Practicar. La subida de paquetes de fotos/PDF del alumno es para ESO y Bachillerato; el adulto supervisa los materiales.
+
+## Instrucciones de uso y manual
+
+- `/ayuda` sirve `app/guide/manual.html`; `/ayuda/pdf` sirve `app/guide/manual.pdf`. Mantener ambas versiones sincronizadas con los nombres y recorridos reales de la web, incluidas restricciones por perfil y configuración.
+- Conservar las ilustraciones, accesibilidad, ejemplos y controles del manual. El progreso se guarda localmente en el navegador.
+- Tras editar el HTML, ejecutar `node scripts/build_manual.mjs` con Node.js 22+ y Chrome/Chromium (`CHROME_PATH` opcional). Revisar capturas y páginas renderizadas del PDF; una generación correcta no sustituye la revisión visual.
+- Actualizar también README y las guías relacionadas cuando cambie el funcionamiento. No dar a entender que un parche publicado ya está instalado en el servidor.

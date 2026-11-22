@@ -1,5 +1,11 @@
 # Cambios de Aula IA
 
+## 1.4.2 · 2026-11-22
+
+- Manual interactivo y PDF sincronizados con el aula actual: menú con Inglés, prácticas de Escucha con reproducción automática, pronunciación, voz, materiales y repasos.
+- Nuevas misiones ilustradas y guía del adulto para configurar inglés, supervisar y distinguir tokens OpenAI, caracteres de voz y evaluación Azure. Conserva filtros por etapa y progreso local.
+- Instrucciones de instalación y uso actualizadas en README y guías relacionadas. Generador reproducible del PDF desde el HTML, con comprobaciones de imágenes, filtros, progreso y cuatro anchos de pantalla.
+
 ## 1.4.1 · 2026-11-22
 
 - Los ejercicios nuevos de Escucha conservan su actividad: el tutor presenta en inglés el enunciado y sus instrucciones al crearlos y al abrirlos por primera vez en la sesión, sin revelar la solución.

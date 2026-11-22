@@ -1,4 +1,4 @@
-# Consumo y límites de IA · Aula IA 1.2.1
+# Consumo y límites de IA · Aula IA 1.4.2
 
 El adulto accede desde **Panel de adulto → Consumo y límites de IA** (`/consumo`). El alumno no tiene acceso a los datos de consumo de otros perfiles ni puede modificar presupuestos.
 
@@ -14,6 +14,8 @@ El adulto accede desde **Panel de adulto → Consumo y límites de IA** (`/consu
 
 **Azure Speech** tiene otra sección con llamadas de síntesis, caracteres de texto, errores, lecturas reutilizadas, alumnos e histórico. Su reserva mensual y su límite aparecen exclusivamente en esta sección. No se le atribuyen los tokens ni el coste del tutor OpenAI.
 
+La tarjeta **Pronunciación Azure · audio** muestra las evaluaciones registradas y los minutos confirmados del periodo. Aparte indica los segundos reservados para la familia durante el mes UTC, incluyendo intentos pendientes o fallidos. Este tiempo no se suma a los caracteres de síntesis ni a los tokens de OpenAI. Los límites de evaluación se ajustan en **Panel de adulto → Pronunciación · Azure básico** y en cada perfil, no en el presupuesto de tokens de texto.
+
 El resumen del panel de adulto también muestra cada proveedor por separado. Las cachés se atribuyen al proveedor que generó la voz. Cada histórico conserva hasta 25 llamadas propias, por lo que una ráfaga de Azure no oculta las últimas llamadas de OpenAI. Si hay datos de otros proveedores, como Ollama, se presentan en otra sección propia.
 
 Los filtros de fecha y alumno afectan a todas las secciones. Los presupuestos de texto y la reserva global de Azure mantienen su ámbito mensual; la cuota diaria pedagógica se presenta aparte. La separación se aplica también a los registros anteriores que ya tenían proveedor, sin modificar sus datos.
@@ -24,6 +26,7 @@ Los filtros de fecha y alumno afectan a todas las secciones. Los presupuestos de
 - Tokens de entrada y salida comunicados por el proveedor. Los tokens de entrada en caché son un subconjunto de la entrada y no se vuelven a sumar. La salida puede incluir razonamiento u otros tokens que el modelo comunique, aunque no aparezcan como texto visible.
 - Llamadas por perfil, distinguiendo las realizadas por el adulto para ese alumno. Una pregunta puede generar varias llamadas, incluida la revisión pedagógica o un reintento.
 - Voz Azure: caracteres del texto solicitado y contador global de reservas locales. Son unidades diferentes de los tokens y de los caracteres facturados por Azure.
+- Pronunciación Azure: duración de evaluación confirmada, intentos y reserva local de tiempo. Un fallo conserva su reserva porque el proveedor podría haber procesado el audio. El historial por alumno se consulta en el perfil del panel adulto.
 - Transcripción: duración y/o tokens cuando el proveedor los comunica. Un contador ausente aparece como desconocido, no como un cero medido.
 - Lecturas reutilizadas de la base de datos o de la caché de saludos, sin contarlas como una nueva llamada al proveedor.
 - Coste estimado de texto según las tarifas configuradas en el momento de la llamada. No incluye voz ni transcripción; no es el saldo ni la factura del proveedor.
@@ -42,6 +45,8 @@ Por eso una consulta puede bloquearse **antes de agotar los tokens medidos**, si
 
 El presupuesto de texto no limita por sí mismo tokens de voz o duración de audio. Se mantienen los controles específicos ya existentes: límite diario de peticiones por alumno, límite no reembolsable de transcripciones, límite de generaciones de voz y reserva mensual local de Azure.
 
+Pronunciación añade su propio permiso y límites: inicialmente desactivada para la familia, máximo de 20 segundos por lectura, reserva familiar de 240 minutos mensuales, 60 minutos por alumno y 10 intentos al día. El adulto puede cambiar los límites locales dentro de los valores permitidos. También cuenta la cuota general de peticiones del alumno. [Activación y funcionamiento](PRONUNCIACION_Y_ESCUCHA.md).
+
 ## Histórico y cuota del proveedor
 
 Los registros anteriores de `AIUsage` se conservan. Como no tenían alumno asociado, aparecen en **Sin alumno asignado** y cuentan para el total familiar cuando corresponda. No es posible reconstruir con fiabilidad su distribución por alumno ni llamadas antiguas que no se registraron.
@@ -52,16 +57,16 @@ Referencias: [contadores y límites de tokens de OpenAI](https://developers.open
 
 ## Instalar
 
-El parche es acumulativo y conserva las credenciales y la región de Azure de `.env`. Subir `Aula_IA_parche_v1.2.1.tar.gz` a `/tmp` y ejecutar:
+El parche es acumulativo y conserva las credenciales y la región de Azure de `.env`. Subir `Aula_IA_parche_v1.4.2.tar.gz` a `/tmp` y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.2.1-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.4.2-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.2.1.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.4.2.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web

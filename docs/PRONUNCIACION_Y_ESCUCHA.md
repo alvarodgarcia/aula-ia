@@ -1,4 +1,4 @@
-# Pronunciación y Escucha · Aula IA 1.4.1
+# Pronunciación y Escucha · Aula IA 1.4.2
 
 ## Activar la pronunciación
 
@@ -42,16 +42,16 @@ Sin JavaScript se mantiene el envío tradicional del formulario. La reproducció
 
 ## Instalar el parche acumulativo
 
-Subir `Aula_IA_parche_v1.4.1.tar.gz` a `/tmp` del servidor y ejecutar:
+Subir `Aula_IA_parche_v1.4.2.tar.gz` a `/tmp` del servidor y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.4.1-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.4.2-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.4.1.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.4.2.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web

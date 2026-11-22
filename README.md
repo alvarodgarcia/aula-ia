@@ -2,7 +2,13 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión actual: 1.4.1.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.4.2.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+
+## Cómo usar el aula
+
+La ayuda de la web está en **Cómo usar Aula IA** (`/ayuda`), accesible desde el pie de página y el menú del alumno. Incluye misiones ilustradas, ejemplos, seguimiento del recorrido, filtros por etapa y una sección para el adulto. El PDF descargable (`/ayuda/pdf`) contiene las mismas instrucciones, sin los controles interactivos, y se puede enviar a la familia.
+
+El recorrido actual es **Inicio → Inglés → Apuntes → Repasos**. En Escucha el tutor inicia el audio inglés tras proponer una práctica; los ejercicios nuevos de esa actividad presentan sus instrucciones al abrirlos por primera vez en la sesión. Pronunciación es una evaluación separada que debe habilitar el adulto. Ver [activación, límites e instalación del parche actual](docs/PRONUNCIACION_Y_ESCUCHA.md).
 
 ![Acceso a Aula IA](docs/screenshots/acceso.png)
 
@@ -51,7 +57,7 @@ Requisitos: VM Linux con Docker Engine y Compose. Orientación inicial: 2 vCPU, 
 
 1. Copiar `.env.example` a `.env` y definir contraseñas y un secreto de sesión aleatorios.
 2. Mantener coherente la contraseña de PostgreSQL en `POSTGRES_PASSWORD` y `DATABASE_URL`.
-3. Configurar OpenAI o un servidor Ollama privado. La voz del tutor requiere la configuración de OpenAI.
+3. Configurar OpenAI o un servidor Ollama privado para el tutor. La síntesis de voz utiliza el proveedor configurado (OpenAI o Azure Speech); la transcripción de conversación y dictado requiere OpenAI. La evaluación de pronunciación utiliza Azure Speech y activación del adulto.
 4. Crear `data/uploads` y `backups`, asignando `data` al UID 10001 del contenedor.
 5. Ejecutar `docker compose up -d --build` y comprobar `/health`.
 
@@ -72,12 +78,19 @@ No subir `.env`, claves, bases de datos, apuntes reales ni copias de seguridad. 
 - `codex/<mejora>`: ramas temporales para cambios concretos.
 - Etiquetas `vX.Y.Z` y una entrega de GitHub por versión: mayor para incompatibilidades, menor para funciones y parche para correcciones.
 
-Cada mejora debe actualizar [CHANGELOG.md](CHANGELOG.md) y `VERSION`, superar las comprobaciones y publicarse como una nueva versión. Esta carpeta no tenía historial propio de Git; `v1.0.0` conserva el estado actual como punto de partida, sin inventar versiones anteriores.
+Cada mejora debe actualizar [CHANGELOG.md](CHANGELOG.md) y `VERSION`, superar las comprobaciones y publicarse como una nueva versión. `v1.0.0` conserva el estado de referencia; las etiquetas y entregas anteriores se mantienen.
 
 Pruebas locales, tras instalar las dependencias:
 
 ```sh
 python tests/security_regression.py
+python tests/azure_voice_regression.py
+python tests/consumption_regression.py
+python tests/english_regression.py
+python tests/pronunciation_regression.py
+node tests/conversation_controls.mjs
 ```
 
 La prueba usa una base SQLite temporal y respuestas de IA simuladas. Las comprobaciones de GitHub incluyen estas pruebas y una consulta de vulnerabilidades de las dependencias. Antes de publicar una entrega, validar también el contenedor Linux, OCR y PostgreSQL.
+
+Para mantener el manual, editar `app/guide/manual.html` y regenerar su PDF con `node scripts/build_manual.mjs` (Node.js 22+ y Chrome/Chromium; `CHROME_PATH` permite elegir el ejecutable). El proceso comprueba imágenes, navegación por etapa, progreso y cuatro anchos de pantalla. Revisar visualmente las capturas y todas las páginas del PDF antes de publicar. La guía y el PDF deben indicar la misma versión que `VERSION`.

@@ -2,7 +2,7 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión actual: 1.4.2.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.5.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
 
 ## Cómo usar el aula
 
@@ -11,6 +11,8 @@ La ayuda de la web está en **Cómo usar Aula IA** (`/ayuda`), accesible desde e
 El recorrido actual es **Inicio → Inglés → Apuntes → Repasos**. En Escucha el tutor inicia el audio inglés tras proponer una práctica; los ejercicios nuevos de esa actividad presentan sus instrucciones al abrirlos por primera vez en la sesión. Pronunciación es una evaluación separada que debe habilitar el adulto. Ver [activación, límites e instalación del parche actual](docs/PRONUNCIACION_Y_ESCUCHA.md).
 
 ![Acceso a Aula IA](docs/screenshots/acceso.png)
+
+[Listening con tres niveles](docs/LISTENING.md): el adulto decide por alumno si se muestra la transcripción. La pregunta permanece visible, con repetir audio y ayuda para responder.
 
 ## Inglés especializado
 
@@ -88,6 +90,7 @@ python tests/azure_voice_regression.py
 python tests/consumption_regression.py
 python tests/english_regression.py
 python tests/pronunciation_regression.py
+python tests/listening_regression.py
 node tests/conversation_controls.mjs
 ```
 

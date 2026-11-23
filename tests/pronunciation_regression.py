@@ -102,8 +102,8 @@ class PronunciationTests(unittest.TestCase):
         self.assertTrue(result.json()['signature']);self.assertEqual(result.json()['count'],1)
         with self.f.f.mock(self.f.provider):result=self.student.post('/mis-tareas/tutor',data=body)
         self.assertEqual(result.status_code,303)
-        self.assertIn('data-auto-read="yes"',self.student.get(result.headers['location']).text)
-        self.assertIn('data-auto-read="no"',self.student.get(result.headers['location']).text)
+        self.assertIn('name="difficulty"',self.student.get(result.headers['location']).text)
+        self.assertNotIn('data-auto-read="yes"',self.student.get(result.headers['location']).text)
     def test_missing_and_non_finite_scores_are_not_fabricated(self):
         with self.assertRaises(ValueError):main.pronunciation.assessment_result({'RecognitionStatus':'Success','NBest':[{'AccuracyScore':float('nan')}]},'en-GB')
         result=main.pronunciation.assessment_result({'RecognitionStatus':'Success','NBest':[{'AccuracyScore':80}]},'en-GB')

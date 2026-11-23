@@ -187,14 +187,16 @@
 
   async function playNeural(playback, text, character, signature) {
     const locale = playback.locale || tutor.dataset.locale || "es-ES";
-    const key = `${locale}:${character}:${signature}`;
+    const key = `${locale}:${character}:${playback.listeningId || signature}`;
     let clip = clips.get(key);
     if (!clip) {
       const controller = new AbortController();
       playback.stop = () => controller.abort();
-      const response = await fetch("/tutor/voz", {
+      const response = await fetch(playback.listeningId ? `/exercise/${playback.listeningId}/listening/audio` : "/tutor/voz", {
         method: "POST", signal: controller.signal,
-        body: new URLSearchParams({ text, character, signature, locale, csrf_token: question.elements.csrf_token.value }),
+        body: new URLSearchParams(playback.listeningId
+          ? {character, csrf_token: question.elements.csrf_token.value}
+          : { text, character, signature, locale, csrf_token: question.elements.csrf_token.value }),
       });
       if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) {
         throw new Error("Proveedor de voz no disponible");
@@ -305,6 +307,21 @@
       playBrowser(playback, text.trim(), character);
     });
   });
+  const listeningButton = tutor.querySelector('[data-listening-play]');
+  listeningButton?.addEventListener('click', async () => {
+    const wasPlaying = current?.button === listeningButton;
+    stopReading();
+    if (wasPlaying) return;
+    if (tutor.dataset.conversation === 'on') tutor.querySelector('[data-conversation-toggle]')?.click();
+    const playback = {button:listeningButton, label:listeningButton.textContent,
+      locale:tutor.dataset.locale, listeningId:listeningButton.dataset.listeningPlay};
+    current=playback; listeningButton.textContent='Detener audio'; setState('idle','Preparando el audio…');
+    try { await playNeural(playback, '', selectedCharacter.value, ''); }
+    catch { if(current===playback) resetReading('No se pudo reproducir. Pulsa Escuchar / repetir para intentarlo de nuevo.'); }
+  });
+  if (tutor.dataset.listeningAuto === 'yes' && listeningButton) {
+    tutor.dataset.listeningAuto='no'; listeningButton.click();
+  }
   if (tutor.dataset.autoRead === "yes" || tutor.dataset.autoTarget) {
     const target = tutor.dataset.autoTarget || "tutor-reply-text";
     tutor.dataset.autoRead = "no";

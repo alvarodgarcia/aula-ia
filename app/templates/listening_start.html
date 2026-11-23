@@ -1,0 +1,13 @@
+<section class="card section-block">
+  <h2>Escucha · elige tu reto</h2>
+  <p>Los tres niveles se adaptan a tu inglés y curso. El nivel 3 tiene un texto más amplio y más información que relacionar.</p>
+  <p class="privacy-note">{{ 'Puedes consultar la transcripción.' if english_config.listening_show_text else 'Modo solo audio: verás la pregunta, pero no la transcripción.' }} Puedes repetir el audio y pedir ayuda.</p>
+  <form method="post" action="/mis-tareas/ingles/listening" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <fieldset class="listening-levels"><legend>Dificultad de esta práctica</legend>
+      {% for value,label in listening_difficulties.items() %}<label><input type="radio" name="difficulty" value="{{ value }}"{% if value == 1 %} checked{% endif %}> <strong>{{ label }}</strong><span>{{ 'Frases cortas y un dato claro.' if value == 1 else 'Conecta ideas y encuentra detalles.' if value == 2 else 'Una historia más larga para relacionar información.' }}</span></label>{% endfor %}
+    </fieldset>
+    <button class="button button-primary">Empezar listening</button>
+  </form>
+  <p class="source-ref">El tutor prepara la actividad y empieza a hablar al abrirla. Si tu navegador requiere un toque, usa Escuchar / repetir. Los niveles son práctica, no certificados.</p>
+</section>

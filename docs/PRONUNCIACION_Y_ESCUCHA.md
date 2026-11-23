@@ -1,4 +1,4 @@
-# Pronunciación y Escucha · Aula IA 1.4.2
+# Pronunciación y Escucha · Aula IA 1.5.0
 
 ## Activar la pronunciación
 
@@ -30,28 +30,24 @@ Esta evaluación no utiliza otra transcripción de OpenAI ni otra llamada al tut
 
 ## Escucha más dinámica
 
-En **Inglés → Escucha**, pulsar **Empezar una práctica** o enviar una pregunta prepara el nuevo turno y reproduce la respuesta en inglés automáticamente, sin recargar la página ni pulsar «leer». Se conservan la variedad británica o estadounidense y el personaje elegidos. El texto de escucha permanece plegado para practicar primero con el oído; puede desplegarse después.
+En **Inglés → Escucha**, elegir uno de los tres niveles relativos y pulsar **Empezar listening**. Se crea el ejercicio y el tutor intenta iniciar el audio al abrirlo. La pregunta queda visible para responder. El adulto elige por alumno si el pasaje puede verse o permanece solo en audio.
 
-Se puede detener el audio y volver a escucharlo. Algunos navegadores restringen la reproducción automática: si ocurre, aparece el aviso para pulsar el control de escucha. El micrófono no se abre por esta reproducción; para conversar por voz hay que activarlo expresamente. Al salir de la página o dejarla en segundo plano se detiene el audio. Recargar no reproduce automáticamente una respuesta antigua.
+El mismo botón permite detener y repetir; si el navegador exige un toque, el alumno usa **Escuchar / repetir**. El micrófono requiere activación expresa. Hay una estrategia de ayuda y se pueden consultar dudas sobre la pregunta. Los listening antiguos que no separan pregunta y pasaje se sustituyen por una práctica nueva cuando el adulto oculta el texto.
 
-Desde 1.4.1, si se crea un ejercicio en Escucha, la respuesta hablada presenta en inglés el enunciado y las instrucciones para realizarlo. Al abrir ese ejercicio por primera vez en la sesión, el tutor inicia también esa presentación automáticamente. El mismo botón permite detenerla y volver a escucharla; las recargas y la revisión del adulto no la inician. No se leen la solución, las pistas ni la respuesta de referencia. Las preguntas al tutor dentro del ejercicio conservan la especialidad de Escucha.
-
-Esto se aplica a los ejercicios creados desde esta revisión: los antiguos no conservaban su actividad de origen y no se reclasifican por suposición. Se crea la tabla `english_exercise_contexts`, sin alterar columnas existentes. Abrir el ejercicio no genera otra consulta de texto al tutor; la síntesis de voz mantiene sus límites y contabilidad habituales. La aplicación recuerda las últimas 20 aperturas de ejercicios de Escucha en la sesión para evitar repeticiones al recargar.
-
-Sin JavaScript se mantiene el envío tradicional del formulario. La reproducción automática requiere JavaScript y un navegador compatible.
+[Guía completa de niveles, permisos y ayuda de Listening](LISTENING.md).
 
 ## Instalar el parche acumulativo
 
-Subir `Aula_IA_parche_v1.4.2.tar.gz` a `/tmp` del servidor y ejecutar:
+Subir `Aula_IA_parche_v1.5.0.tar.gz` a `/tmp` del servidor y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.4.2-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.5.0-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.4.2.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.5.0.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web

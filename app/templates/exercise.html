@@ -2,7 +2,7 @@
 {% block page_styles %}
 {% if age_group %}
 <link rel="stylesheet" href="/static/student.css?v=10">
-<script defer src="/static/tutor-voice.js?v=13"></script>
+<script defer src="/static/tutor-voice.js?v=14"></script>
 <script defer src="/static/tutor-conversation.js?v=4"></script>
 {% if math_board %}<script defer src="/static/math-board.js"></script>{% endif %}
 {% endif %}
@@ -28,6 +28,8 @@
     {% endif %}
     {% if exercise.exercise_mode == "tutor" %}<p class="student-subject">Creado por el tutor</p>{% endif %}
     <div class="prompt" id="exercise-prompt">{{ exercise.prompt }}</div>
+    {% if listening_passage %}<details class="listening-transcript"><summary>Ver texto de escucha</summary><p lang="{{ english_locale }}">{{ listening_passage }}</p></details>{% endif %}
+    {% if listening_audio_id %}<p class="source-ref">{{ exercise.difficulty }} · La pregunta está arriba. Escucha, repite cuando necesites y escribe tu respuesta. La transcripción la decide el adulto.</p>{% endif %}
     {% if math_board %}{% include "math_board.html" %}{% endif %}
     {% if exercise.source_reference %}<p class="source-ref">Material de referencia: {{ exercise.source_reference }}</p>{% endif %}
     {% if exercise.solved %}<div class="success-box">{{ "¡Completado! Lo conseguiste." if age_group == "early" else "¡Completado! Has resuelto el ejercicio." }}</div>{% endif %}
@@ -82,7 +84,7 @@
 </section>
 {% if attempts or not age_group %}
 <section class="card section-block"><div class="section-heading"><div>{% if not age_group %}<span class="eyebrow">Historial</span>{% endif %}<h2>{{ "Mis intentos" if age_group == "early" else "Intentos recientes" }}</h2></div></div>
-  {% if attempts %}<ol class="attempt-list">{% for a in attempts %}<li><span class="status-dot {% if a.correct %}done{% endif %}"></span><div><strong>{% if a.correct %}Correcto{% else %}Revisar{% endif %}</strong><p>{{ a.feedback }}</p><small>{{ a.created_at.strftime("%d/%m/%Y %H:%M") }}</small></div></li>{% endfor %}</ol>{% else %}<p class="empty">Todavía no hay intentos. ¡Tú puedes!</p>{% endif %}
+  {% if attempts %}<ol class="attempt-list">{% for a in attempts %}<li><span class="status-dot {% if a.correct %}done{% endif %}"></span><div><strong>{% if a.correct %}Correcto{% else %}Revisar{% endif %}</strong><p>{{ ("¡Correcto!" if a.correct else "Escucha otra vez y consulta la ayuda si lo necesitas.") if hide_listening_feedback else a.feedback }}</p><small>{{ a.created_at.strftime("%d/%m/%Y %H:%M") }}</small></div></li>{% endfor %}</ol>{% else %}<p class="empty">Todavía no hay intentos. ¡Tú puedes!</p>{% endif %}
 </section>
 {% endif %}
 {% endblock %}

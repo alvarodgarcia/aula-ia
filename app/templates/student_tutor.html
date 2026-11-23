@@ -6,7 +6,7 @@
 {% set is_hint = tutor_reply and tutor_reply.kind == "hint" %}
 <aside class="card tutor-card student-tutor" id="student-tutor" data-state="idle" data-profile="{{ profile.id }}"
        data-saved-character="{{ saved_tutor or '' }}" data-greet-on-entry="{{ 'yes' if greet_on_entry else 'no' }}"
-       data-auto-read="{{ 'yes' if autoplay_listening else 'no' }}" data-auto-target="{{ autoplay_target or '' }}" data-voice-provider="{{ tutor_voice_provider_label() }}" data-locale="{{ tutor_locale }}"
+       data-listening-auto="{{ 'yes' if listening_auto else 'no' }}" data-auto-read="{{ 'yes' if autoplay_listening else 'no' }}" data-auto-target="{{ autoplay_target or '' }}" data-voice-provider="{{ tutor_voice_provider_label() }}" data-locale="{{ tutor_locale }}"
        data-rate="{{ 0.9 if age_group == 'early' else 0.96 if age_group == 'primary' else 1 }}">
   <details{% if not in_exercise or age_group != "teen" or tutor_reply or listening_exercise %} open{% endif %}>
     <summary class="tutor-toggle">
@@ -26,8 +26,9 @@
       {% if english_activity == "pronunciation" %}{% include "pronunciation.html" %}{% endif %}
       <div{% if english_activity == "pronunciation" %} hidden{% endif %}>
       {% if in_exercise %}
-      {% if listening_exercise %}<p id="exercise-listening-intro" lang="{{ tutor_locale }}">{{ listening_introduction }}</p><p class="source-ref">El tutor presenta la actividad en inglés al abrirla por primera vez. Puedes detener el audio con el mismo botón y volver a escucharlo.</p>{% endif %}
-      <div class="tutor-actions">
+      {% if listening_audio_id %}{% include "listening_controls.html" %}{% endif %}
+      {% if listening_exercise and not listening_audio_id %}<p id="exercise-listening-intro" lang="{{ tutor_locale }}">{{ listening_introduction }}</p><p class="source-ref">El tutor presenta la actividad en inglés al abrirla por primera vez. Puedes detener el audio con el mismo botón y volver a escucharlo.</p>{% endif %}
+      <div class="tutor-actions"{% if listening_audio_id %} hidden{% endif %}>
         <div data-tutor-voice-control hidden>
           <button type="button" class="button button-secondary" data-tutor-read="{{ 'exercise-listening-intro' if listening_exercise else 'exercise-prompt' }}" data-tutor-signature="{{ tutor_voice_signature(profile.id, listening_introduction if listening_exercise else exercise.prompt, tutor_locale) }}">{{ 'Escuchar la actividad otra vez' if listening_exercise else 'Léeme el ejercicio' }}</button>
         </div>

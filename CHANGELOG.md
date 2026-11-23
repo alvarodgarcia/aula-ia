@@ -1,5 +1,13 @@
 # Cambios de Aula IA
 
+## 1.5.0 · 2026-11-23
+
+- Listening con tres dificultades relativas al nivel de inglés y curso, con longitud creciente y validación antes de guardar.
+- El adulto configura por alumno si mostrar la transcripción o mantener solo audio. Pregunta, respuesta y pasaje se guardan separados; en modo oculto no se envía el pasaje al HTML/JSON del alumno.
+- Audio automático al abrir la actividad, detener/repetir con caché y ayuda de comprensión sin entregar la transcripción. Preguntas al tutor revisadas y correcciones sin copiar el pasaje.
+- Dos tablas nuevas sin cambiar columnas anteriores; se conservan cuotas, supervisión y separación de consumo. Guías y PDF actualizados.
+
+
 ## 1.4.2 · 2026-11-22
 
 - Manual interactivo y PDF sincronizados con el aula actual: menú con Inglés, prácticas de Escucha con reproducción automática, pronunciación, voz, materiales y repasos.

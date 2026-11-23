@@ -26,3 +26,5 @@ El usuario autorizó probar Azure Speech F0 para corregir el acento usando voces
 - Conservar las ilustraciones, accesibilidad, ejemplos y controles del manual. El progreso se guarda localmente en el navegador.
 - Tras editar el HTML, ejecutar `node scripts/build_manual.mjs` con Node.js 22+ y Chrome/Chromium (`CHROME_PATH` opcional). Revisar capturas y páginas renderizadas del PDF; una generación correcta no sustituye la revisión visual.
 - Actualizar también README y las guías relacionadas cuando cambie el funcionamiento. No dar a entender que un parche publicado ya está instalado en el servidor.
+
+- Desde 1.5.0, Escucha usa `ListeningPreference` por alumno y `ListeningExercise` para separar pasaje privado y pregunta. La creación va por `/mis-tareas/ingles/listening`, con dificultad 1-3 relativa al MCER y duración acotada por edad. En modo solo audio, no enviar el pasaje al HTML/JSON del alumno ni a la generación de ayuda; el audio se sirve por ID con autorización. Mantener la pregunta visible, repetir y ayuda. Los modelos anteriores se conservan para compatibilidad con ejercicios históricos.

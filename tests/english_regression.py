@@ -46,10 +46,10 @@ class EnglishTests(unittest.TestCase):
             self.assertEqual(main.tutor_history(db,self.pid),[])
         self.assertEqual(main.accounting.report('mes')['providers']['openai']['totals']['text_tokens'],260)
         page=self.student.get('/mis-tareas/ingles?activity=listening')
-        self.assertEqual(page.status_code,200);self.assertIn('Ver el texto de escucha',page.text)
-        self.assertIn('Ayuda en español',page.text);self.assertIn('data-locale="en-GB"',page.text)
+        self.assertEqual(page.status_code,200);self.assertIn('Dificultad de esta práctica',page.text)
+        self.assertIn('value="3"',page.text);self.assertIn('Británico',page.text)
         if os.getenv('AULA_PREVIEW_DIR'):
-            Path(os.environ['AULA_PREVIEW_DIR'],'ingles-alumno.html').write_text(page.text,encoding='utf-8')
+            Path(os.environ['AULA_PREVIEW_DIR'],'ingles-alumno.html').write_text(self.student.get('/mis-tareas/ingles?activity=conversation').text,encoding='utf-8')
             Path(os.environ['AULA_PREVIEW_DIR'],'ingles-adulto.html').write_text(self.admin.get(f'/?alumno={self.pid}').text,encoding='utf-8')
     def test_full_english_and_pause(self):
         self.config(support='english',locale='en-US')

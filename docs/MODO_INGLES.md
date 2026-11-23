@@ -1,4 +1,4 @@
-# Inglés especializado · Aula IA 1.4.2
+# Inglés especializado · Aula IA 1.5.0
 
 El modo Inglés usa el personaje y el acceso del alumno que ya existen. Se añade a las demás materias, sin otra cuenta ni otra web.
 
@@ -18,6 +18,10 @@ En **Panel de adulto → Perfiles de alumnos → Configurar → Profesor de ingl
 No es una prueba oficial de nivel ni una certificación. Se aceptan variantes británicas y americanas correctas, aunque se indique una variedad de referencia.
 
 ![Configuración del adulto con datos ficticios](screenshots/ingles-adulto.png)
+
+## Listening actual
+
+En **Profesor de inglés → Texto de listening**, el adulto decide si mostrar u ocultar el pasaje por alumno. El alumno entra en **Escucha**, elige uno de tres retos adaptados a nivel y curso y pulsa **Empezar listening**. La pregunta se muestra siempre; puede repetir el audio y consultar ayuda sin obtener la transcripción oculta. [Funcionamiento completo](LISTENING.md).
 
 ## Para el alumno
 
@@ -57,16 +61,16 @@ Referencias: [descriptores MCER](https://www.coe.int/en/web/common-european-fram
 
 ## Instalar el parche acumulativo
 
-Subir `Aula_IA_parche_v1.4.2.tar.gz` a `/tmp` del servidor y ejecutar:
+Subir `Aula_IA_parche_v1.5.0.tar.gz` a `/tmp` del servidor y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.4.2-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.5.0-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.4.2.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.5.0.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web

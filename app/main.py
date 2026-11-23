@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
-from . import accounting, english, learning, pronunciation, voice
+from . import accounting, english, learning, listening, pronunciation, voice
 from .security import SecurityMiddleware
 
 ROOT = Path(__file__).resolve().parent
@@ -145,6 +145,18 @@ class EnglishExerciseContext(Base):
     __tablename__ = "english_exercise_contexts"
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id", ondelete="CASCADE"), primary_key=True)
     activity: Mapped[str] = mapped_column(String(20))
+
+class ListeningPreference(Base):
+    __tablename__ = "listening_preferences"
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True)
+    show_text: Mapped[bool] = mapped_column(Boolean, default=True)
+
+class ListeningExercise(Base):
+    __tablename__ = "listening_exercises"
+    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id", ondelete="CASCADE"), primary_key=True)
+    passage: Mapped[str] = mapped_column(Text)
+    difficulty: Mapped[int] = mapped_column(Integer)
+    locale: Mapped[str] = mapped_column(String(10))
 
 class StudyDocument(Base):
     __tablename__ = "study_documents"
@@ -485,6 +497,10 @@ def exercise_for_session(request: Request, db: Session, exercise_id: int) -> Exe
     exercise = db.scalar(query)
     if not exercise:
         raise HTTPException(status_code=404, detail="Ejercicio no encontrado")
+    if request.method != 'GET' and not authenticated(request):
+        old_context = db.get(EnglishExerciseContext, exercise.id)
+        if old_context and old_context.activity == 'listening' and db.get(ListeningExercise, exercise.id) is None and not english_config(db, exercise.profile_id)['listening_show_text']:
+            raise HTTPException(status_code=409, detail='Crea un listening nuevo: este ejercicio antiguo no separa pregunta y texto.')
     return exercise
 
 def pin_digest(pin: str, salt: str) -> str:
@@ -897,9 +913,19 @@ async def student_tutor_answer(
     config = english_config(db, profile.id) if english_mode else None
     if config and not config["enabled"]:
         raise StudyRequestBlocked("El adulto ha pausado el modo Inglés.")
+    listening_help_item = db.get(ListeningExercise, exercise.id) if exercise is not None else None
+    if listening_help_item and re.search(r'transcri|transcript|texto completo|entire|full text|traduc|translate|answer|respuesta', question, re.I):
+        return listening.HELP, None, None
+    if config and not config['listening_show_text'] and activity == 'listening':
+        if exercise is None or db.get(ListeningExercise, exercise.id) is None:
+            raise StudyRequestBlocked('Abre Escucha y elige uno de los tres niveles para iniciar una práctica.')
     history = tutor_history(db, profile.id) if review_notes is None else scoped_tutor_history(db, profile.id, review_turns or [])
     if config:
         history = list(reversed(db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(6)).all()))
+        if not config['listening_show_text']:
+            history = [turn for turn in history if turn.activity != 'listening']
+    if listening_help_item:
+        history = []
     context = {
         "edad": profile.age, "etapa": profile.stage, "ciclo": profile.cycle, "curso": profile.course,
         "fecha_actual": learning.school_day(),
@@ -946,6 +972,11 @@ async def student_tutor_answer(
     if config:
         system = system.replace("Responde en español conversacional, natural al leerse en voz alta.", "Responde en inglés natural adecuado al nivel.")
         system += english.instruction(config, activity)
+    if listening_help_item:
+        system += (' AYUDA DE LISTENING: solo conoces la pregunta visible, no el texto del audio. '
+                   'Explica qué pide la pregunta o una palabra de la pregunta, da una estrategia y un ejemplo '
+                   'ajeno a esta actividad. No inventes ni reconstruyas el pasaje ni des su respuesta. '
+                   'No traduzcas la grabación. Devuelve exercise=null; para otra práctica debe elegir un nivel. ')
     if spoken:
         system += (
             " Estás hablando por voz. Empieza por la explicación útil y trata una idea cada vez. "
@@ -960,6 +991,8 @@ async def student_tutor_answer(
         "respuesta_de_referencia": exercise.answer_key if exercise is not None else None,
         "ultimo_turno": context["conversacion_reciente"][-1:],
     }
+    if listening_help_item:
+        review_context['texto_audio_privado'] = listening_help_item.passage
     for attempt in range(2):
         result = await ai_request(system, json.dumps(context, ensure_ascii=False), "tutor", json_mode=True)
         try:
@@ -974,6 +1007,8 @@ async def student_tutor_answer(
         new_exercise = tutor_exercise(profile.id, data) if data is not None or create else None
         if config and activity == "listening" and new_exercise is not None and len(new_exercise.prompt) > 1200:
             raise TutorResponseError("El ejercicio de escucha es demasiado largo. Pide una práctica más breve.")
+        if listening_help_item and new_exercise is not None:
+            raise TutorResponseError('Para otra práctica de listening, elige uno de los tres niveles.')
         value = payload.get("reply")
         reply = value[:TUTOR_REPLY_LIMIT].strip() if isinstance(value, str) else ""
         candidate: dict[str, Any] = {"respuesta": reply, "ayuda": help_text, "vocabulario": vocabulary, "observacion": feedback}
@@ -1571,12 +1606,16 @@ def student_login(
         return RedirectResponse("/mis-tareas", status_code=303)
 
 def english_config(db: Session, profile_id: int) -> dict:
-    return english.settings(db.get(EnglishPreference, profile_id))
+    config = english.settings(db.get(EnglishPreference, profile_id))
+    preference = db.get(ListeningPreference, profile_id)
+    config['listening_show_text'] = preference.show_text if preference else True
+    return config
 
 @app.post("/profiles/{profile_id}/ingles")
 def configure_english(profile_id: int, request: Request, csrf_token: str = Form(...),
                       enabled: bool = Form(False), level: str = Form(...), locale: str = Form(...),
-                      support: str = Form(...), goal: str = Form("", max_length=300)) -> Response:
+                      support: str = Form(...), goal: str = Form("", max_length=300),
+                      listening_show_text: bool = Form(True)) -> Response:
     redirect = login_redirect(request)
     if redirect:
         return redirect
@@ -1592,7 +1631,12 @@ def configure_english(profile_id: int, request: Request, csrf_token: str = Form(
             db.add(preference)
         preference.enabled, preference.level, preference.locale = enabled, level, locale
         preference.support, preference.goal = support, goal.strip()
-        audit_event(db, profile_id, "Configuración de inglés", f"{level} · {locale} · {support}", "habilitado" if enabled else "pausado")
+        listening_preference = db.get(ListeningPreference, profile_id)
+        if listening_preference is None:
+            listening_preference = ListeningPreference(profile_id=profile_id)
+            db.add(listening_preference)
+        listening_preference.show_text = listening_show_text
+        audit_event(db, profile_id, "Configuración de inglés", f"{level} · {locale} · {support} · texto listening: {listening_show_text}", "habilitado" if enabled else "pausado")
         db.commit()
     request.session["notice"] = "Configuración de inglés guardada. El nivel es orientativo."
     return RedirectResponse(f"/?alumno={profile_id}#alumno-{profile_id}", status_code=303)
@@ -1607,6 +1651,8 @@ def english_page(request: Request, activity: str = "conversation", phrase: str =
             raise HTTPException(status_code=400, detail="Actividad no válida")
         config = english_config(db, profile.id)
         turns = db.scalars(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(20)).all()
+        if not config['listening_show_text']:
+            turns = [turn for turn in turns if turn.activity != 'listening']
         counts = dict(db.execute(select(EnglishTurn.activity, func.count()).where(EnglishTurn.profile_id == profile.id).group_by(EnglishTurn.activity)).all())
         phrase_id = phrase if phrase in pronunciation.PHRASES else ({'Por valorar': 'hello', 'Pre-A1': 'hello', 'A1': 'school', 'A2': 'weekend', 'B1': 'plans', 'B2': 'opinion'}.get(config['level'], 'choice'))
         autoplay_id = request.session.pop('english_autoplay', None)
@@ -1614,11 +1660,90 @@ def english_page(request: Request, activity: str = "conversation", phrase: str =
         pronunciation_data = pronunciation.overview(profile.id) if activity == 'pronunciation' else None
         return student_view(request, "english.html", profile, english_mode=True, english_config=config,
             english_locale=config["locale"], english_activity=activity, activities=english.ACTIVITIES,
+            listening_difficulties=listening.DIFFICULTIES,
             pronunciation=pronunciation_data, pronunciation_ready=voice.azure_voice.configured(),
             phrase_id=phrase_id, phrase=pronunciation.PHRASES[phrase_id], phrases=pronunciation.PHRASES, autoplay_listening=autoplay,
             starter=english.STARTERS.get(activity,""), english_turns=turns, english_counts=counts, english_vocabulary={t.id: ", ".join(json.loads(t.vocabulary)) for t in turns},
             tutor_history=list(reversed(turns[:6])), english_help=turns[0].spanish_help if turns else "",
             saved_tutor=tutor_character(db, profile.id), greet_on_entry=False)
+
+@app.post("/mis-tareas/ingles/listening")
+async def create_listening(request: Request, csrf_token: str = Form(...),
+                           difficulty: int = Form(..., ge=1, le=3)) -> Response:
+    wants_json = 'application/json' in request.headers.get('accept', '')
+    def failure(message, status):
+        if wants_json:
+            return JSONResponse({'error': message}, status_code=status, headers={'Cache-Control':'no-store'})
+        request.session['notice'] = message
+        return RedirectResponse('/mis-tareas/ingles?activity=listening', status_code=303)
+    with db_session() as db:
+        profile = student_profile(request, db)
+        if profile is None or authenticated(request):
+            return failure('Entra con tu perfil de alumno.', 403)
+        check_csrf(request, csrf_token)
+        config = english_config(db, profile.id)
+        if not config['enabled']:
+            return failure('El adulto ha pausado el modo Inglés.', 403)
+        entry = start_student_request(db, profile.id, 'Listening', f'Nivel relativo {difficulty}/3')
+        if not entry.uses_quota:
+            return failure(entry.reply, 429)
+        try:
+            system = (SUBJECT_TEACHING + STUDY_RULES + english.instruction(config, 'listening', tutor=False)
+                      + listening.instruction(config, profile, difficulty))
+            # One bounded content repair; each real provider call is accounted normally.
+            for attempt in range(2):
+                result = await ai_request(system, 'Prepara una actividad original de comprensión oral.', 'crear_listening', True)
+                payload = parse_json(result['text'])
+                check_study_decision(db, payload, result)
+                try:
+                    data = listening.parse(payload, config, profile, difficulty)
+                    await validate_student_output(db, result, 'Revisa esta actividad original de listening.',
+                        {'texto_audio': data['passage'], 'pregunta': data['question']},
+                        {'etapa': profile.stage, 'curso': profile.course, 'respuesta_de_referencia': data['answer_key'], 'solucion_privada': data['worked_solution']})
+                    break
+                except (ValueError, TutorContentError):
+                    if attempt:
+                        raise
+                    system += ' Rehaz la actividad verificando longitud, separación de pregunta y texto, y corrección.'
+            exercise = Exercise(profile_id=profile.id, subject='Inglés', topic='Listening',
+                exercise_mode=TUTOR_EXERCISE_MODE, difficulty=listening.DIFFICULTIES[difficulty],
+                prompt=data['question'], answer_key=data['answer_key'], worked_solution=data['worked_solution'],
+                hints_json=json.dumps([listening.HELP]))
+            db.add(exercise)
+            db.flush()
+            db.add(ListeningExercise(exercise_id=exercise.id, passage=data['passage'], difficulty=difficulty, locale=config['locale']))
+            db.add(EnglishExerciseContext(exercise_id=exercise.id, activity='listening'))
+            # Public learning history never contains the private audio script.
+            db.add(EnglishTurn(profile_id=profile.id, activity='listening', question=f'Listening {difficulty}/3',
+                reply=data['question'], feedback=f'Práctica de escucha · dificultad {difficulty}/3'))
+            finish_student_request(db, entry, 'apoyo', f'Listening creado · ejercicio {exercise.id}')
+            db.commit()
+            link = f'/exercise/{exercise.id}'
+            if wants_json:
+                return JSONResponse({'listening_id': exercise.id, 'question': data['question'],
+                    'locale': config['locale'], 'link': link}, headers={'Cache-Control':'no-store'})
+            return RedirectResponse(link, status_code=303)
+        except (TutorResponseError, TutorContentError, ValueError, accounting.BudgetExceeded, StudyRequestBlocked) as exc:
+            db.rollback()
+            finish_student_request(db, entry, 'error de listening')
+            return failure('No se pudo preparar una práctica válida. Revisa tus límites y vuelve a intentarlo.', 422)
+
+
+@app.post('/exercise/{exercise_id}/listening/audio')
+async def listening_audio(exercise_id: int, request: Request, csrf_token: str = Form(...), character: str = Form('')) -> Response:
+    with db_session() as db:
+        exercise = exercise_for_session(request, db, exercise_id)
+        if exercise is None or authenticated(request):
+            raise HTTPException(status_code=403, detail='Entra como alumno.')
+        check_csrf(request, csrf_token)
+        item = db.get(ListeningExercise, exercise_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail='Audio no disponible para este ejercicio.')
+        if not english_config(db, exercise.profile_id)['enabled']:
+            raise HTTPException(status_code=403, detail='El modo Inglés está pausado.')
+        character = character if character in voice.VOICES else tutor_character(db, exercise.profile_id) or 'nora'
+        return await generated_voice(db, exercise.profile, listening.audio_text(item.passage, exercise.prompt), character, locale=item.locale)
+
 
 @app.post("/pronunciacion/limites")
 def configure_pronunciation(request: Request, csrf_token: str = Form(...), scope_id: int = Form(..., ge=0, le=2147483647),
@@ -2416,7 +2541,7 @@ async def tutor_conversation_turn(
             return message("No se pudo preparar la respuesta. Puedes preguntar otra vez o escribirla.", 502)
         finish_student_request(db, entry, outcome, reply)
         response_locale = locale if outcome == "apoyo" else "es-ES"
-        latest_english = db.scalar(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(1)) if english_mode and outcome == "apoyo" else None
+        latest_english = db.scalar(select(EnglishTurn).where(EnglishTurn.profile_id == profile.id).order_by(EnglishTurn.id.desc()).limit(1)) if english_mode and outcome == "apoyo" and config['listening_show_text'] else None
         return JSONResponse({
             "transcript": transcript, "truncated": len(text) > TUTOR_QUESTION_LIMIT, "reply": reply,
             "signature": voice.voice_signature(profile.id, reply, response_locale), "locale": response_locale, "link": link,
@@ -3236,6 +3361,11 @@ def exercise_page(exercise_id: int, request: Request, repaso: int | None = None)
         tutor_reply = request.session.pop("tutor_reply", None)
         student = not authenticated(request)
         study_context = db.get(EnglishExerciseContext, exercise.id)
+        listening_item = db.get(ListeningExercise, exercise.id)
+        show_listening_text = english_config(db, exercise.profile_id)['listening_show_text']
+        if student and study_context and study_context.activity == 'listening' and not show_listening_text and not listening_item:
+            request.session['notice'] = 'Este listening antiguo no separa texto y pregunta. Crea una práctica nueva con los tres niveles.'
+            return RedirectResponse('/mis-tareas/ingles?activity=listening', status_code=303)
         listening_exercise = bool(student and study_context and study_context.activity == "listening"
                                   and english.is_subject(exercise.subject) and english_config(db, exercise.profile_id)["enabled"])
         seen = request.session.get("listening_exercises_seen", [])
@@ -3260,8 +3390,13 @@ def exercise_page(exercise_id: int, request: Request, repaso: int | None = None)
         return render(request, "exercise.html", {
             "exercise": exercise, "profile": exercise.profile, "attempts": attempts,
             "listening_exercise": listening_exercise,
+            "listening_audio_id": listening_item.exercise_id if listening_item and student else None,
+            "listening_passage": listening_item.passage if listening_item and (show_listening_text or not student) else '',
+            "listening_auto": autoplay_exercise and listening_item is not None,
+            "listening_help": listening.HELP,
+            "hide_listening_feedback": student and listening_item is not None and not show_listening_text,
             "listening_introduction": english.listening_introduction(exercise.prompt) if listening_exercise else "",
-            "autoplay_target": "exercise-listening-intro" if autoplay_exercise else "",
+            "autoplay_target": "exercise-listening-intro" if autoplay_exercise and listening_item is None else "",
             "age_group": student_age_group(exercise.profile.age) if student else "",
             "saved_tutor": tutor_character(db, exercise.profile_id) if student else "",
             "practice": practice_for_exercise(db, exercise) if student else None,
@@ -3269,7 +3404,7 @@ def exercise_page(exercise_id: int, request: Request, repaso: int | None = None)
             "choices": exercise_choices(db, exercise.id),
             "review_pack": review_pack, "next_review": next_review,
             "review_kind": content.get("kind") if review_pack else None,
-            "english_locale": english_config(db, exercise.profile_id)["locale"] if english.is_subject(exercise.subject) else "es-ES",
+            "english_locale": listening_item.locale if listening_item else english_config(db, exercise.profile_id)["locale"] if english.is_subject(exercise.subject) else "es-ES",
             "show_solution": exercise.solved and not student,
             "tutor_reply": tutor_reply if tutor_reply and tutor_reply["exercise_id"] == exercise.id else None,
             "notice": get_notice(request),
@@ -3348,6 +3483,9 @@ async def submit_answer(
         )
         if english.is_subject(exercise.subject):
             system += english.instruction(english_config(db, exercise.profile_id), "writing", tutor=False)
+        listening_item = db.get(ListeningExercise, exercise.id)
+        if listening_item:
+            user += '\nTexto privado de comprensión oral (no lo reproduzcas en feedback): ' + listening_item.passage
         try:
             result = await ai_request(system, user, "corregir_respuesta", True)
             grade = parse_json(result["text"])
@@ -3363,7 +3501,7 @@ async def submit_answer(
                     fallback = "Revisa el paso que has escrito. Si te atascas, pide una pista con lo que ya has intentado."
                     candidate = grade.get("feedback")
                     feedback = fallback
-                    if isinstance(candidate, str) and candidate.strip() and not obvious_study_block(answer):
+                    if isinstance(candidate, str) and candidate.strip() and not obvious_study_block(answer) and not listening_item:
                         try:
                             await validate_student_output(db, result, "Comenta este intento del alumno.", candidate[:350], {
                                 "enunciado": exercise.prompt[:4000], "intento": answer[:2000],
@@ -3387,6 +3525,8 @@ async def submit_answer(
             number = exercise.attempts_count + 1
             exercise.attempts_count = number
             exercise.solved = correct
+            if listening_item and student:
+                feedback = '¡Correcto! Has completado el ejercicio.' if correct else 'Escucha otra vez y busca el dato que pide la pregunta. Puedes consultar Ayuda para responder.'
             db.add(Attempt(exercise_id=exercise.id, response=answer[:5000], correct=correct, feedback=feedback))
             if not usage_recorded:
                 log_usage(db, result)

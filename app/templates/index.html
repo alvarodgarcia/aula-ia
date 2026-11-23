@@ -101,6 +101,8 @@
         <div class="form-grid"><label>Nivel orientativo<select name="level">{% for level in english_levels %}<option{% if level == config.level %} selected{% endif %}>{{ level }}</option>{% endfor %}</select></label>
         <label>Variedad<select name="locale">{% for value,label in english_locales.items() %}<option value="{{ value }}"{% if value == config.locale %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
         <label>Idioma de apoyo<select name="support">{% for value,label in english_support.items() %}<option value="{{ value }}"{% if value == config.support %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label></div>
+        <label>Texto de listening<select name="listening_show_text"><option value="true"{% if config.listening_show_text %} selected{% endif %}>Mostrar transcripción además del audio</option><option value="false"{% if not config.listening_show_text %} selected{% endif %}>Solo audio: ocultar transcripción</option></select></label>
+        <small>La pregunta siempre aparece. En solo audio, el alumno puede repetir y pedir ayuda sin recibir la transcripción. Los listening antiguos sin pregunta separada se sustituyen con una práctica nueva.</small>
         <label>Objetivo<input name="goal" maxlength="300" value="{{ config.goal }}" placeholder="Ej. conversar sobre su día y practicar el pasado"></label>
         <small>El nivel no se deduce de la edad ni constituye una certificación. Las actividades quedan en supervisión.</small>
         <button class="button button-secondary">Guardar inglés</button>

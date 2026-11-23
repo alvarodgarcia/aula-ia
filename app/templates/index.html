@@ -93,6 +93,7 @@
         </label>
         <div class="inline-actions"><button class="button button-secondary">{{ "Restablecer PIN" if p.id in student_profile_ids else "Guardar PIN" }}</button></div>
       </form>
+      {% include "adult_photo.html" %}
       <h3>Profesor de inglés</h3>
       {% set config=english_profiles[p.id] %}
       <form method="post" action="/profiles/{{ p.id }}/ingles" class="stack">

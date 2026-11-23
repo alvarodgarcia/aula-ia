@@ -1,5 +1,13 @@
 # Cambios de Aula IA
 
+## 1.6.0 · 2026-11-23
+
+- Foto de perfil opcional por alumno, con permiso del adulto desactivado inicialmente. Mi perfil permite elegir cámara/archivos, revisar y guardar o quitar la foto.
+- El adulto puede ver la foto, eliminarla o retirar el permiso; retirarlo elimina la imagen e impide nuevas subidas.
+- Imágenes privadas por sesión y perfil; validación de contenido, resolución y tamaño, recorte a JPEG de 320 píxeles sin metadatos y límite de frecuencia. Sin IA ni almacenamiento del original.
+- Una tabla nueva sin modificar columnas anteriores. Privacidad, instrucciones, manual interactivo y PDF actualizados.
+
+
 ## 1.5.0 · 2026-11-23
 
 - Listening con tres dificultades relativas al nivel de inglés y curso, con longitud creciente y validación antes de guardar.

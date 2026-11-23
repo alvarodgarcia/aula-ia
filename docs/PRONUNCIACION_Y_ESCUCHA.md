@@ -1,4 +1,4 @@
-# Pronunciación y Escucha · Aula IA 1.5.0
+# Pronunciación y Escucha · Aula IA 1.6.0
 
 ## Activar la pronunciación
 
@@ -38,16 +38,16 @@ El mismo botón permite detener y repetir; si el navegador exige un toque, el al
 
 ## Instalar el parche acumulativo
 
-Subir `Aula_IA_parche_v1.5.0.tar.gz` a `/tmp` del servidor y ejecutar:
+Subir `Aula_IA_parche_v1.6.0.tar.gz` a `/tmp` del servidor y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.5.0-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.6.0-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.5.0.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.6.0.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web

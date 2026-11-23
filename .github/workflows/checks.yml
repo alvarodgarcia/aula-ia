@@ -27,6 +27,8 @@ jobs:
         run: python tests/pronunciation_regression.py
       - name: Probar listening, texto oculto, niveles y permisos
         run: python tests/listening_regression.py
+      - name: Probar foto de perfil, permisos y validación de imágenes
+        run: python tests/profile_photo_regression.py
       - name: Probar conversación, ruido y silencio
         run: node tests/conversation_controls.mjs
       - name: Auditar dependencias

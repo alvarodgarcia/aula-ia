@@ -50,3 +50,7 @@ label{font-size:15px;color:#414252}input,select,textarea{font-size:16px;border-c
 
 
 .tutor-actions[hidden]{display:none!important}
+
+.profile-avatar{display:block;width:80px;height:80px;flex:0 0 80px;object-fit:cover;border-radius:50%;border:3px solid #ded7ef;background:#eee9f8}.profile-avatar--initial{display:grid;place-items:center;font-size:2rem;font-weight:700;color:#50378e}.profile-identity{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.profile-identity h1,.profile-identity p{margin:0}.student-help-links{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.profile-settings{max-width:720px;margin:auto}.profile-photo-preview{display:block;max-width:100%;object-fit:cover;border-radius:20px}.profile-photo-preview[hidden],[data-photo-camera-button][hidden]{display:none!important}.profile-photo-permission{padding:18px 0;border-bottom:1px solid #ded7ef}
+
+.profile-settings [hidden]{display:none!important}

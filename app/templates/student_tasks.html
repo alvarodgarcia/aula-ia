@@ -43,7 +43,7 @@
 {% set total = pending|length + completed_tasks %}
 <section class="student-heading" aria-labelledby="student-title">
   <div>
-    <p class="student-greeting">Hola, {{ profile.name }}</p>
+    <div class="profile-identity">{% with avatar_profile=profile, avatar_photo=photo %}{% include "photo_avatar.html" %}{% endwith %}<div><p class="student-greeting">Hola, {{ profile.name }}</p><a href="/mis-tareas/perfil">Mi perfil</a></div></div>
     <h1 id="student-title">Mis tareas</h1>
     <p class="student-course">{{ profile.course }} · {{ profile.stage }}</p>
   </div>

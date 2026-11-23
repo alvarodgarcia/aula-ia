@@ -33,6 +33,8 @@ class SecurityMiddleware:
         limit = 128 * 1024
         if path == "/mis-tareas/ingles/pronunciacion/evaluar":
             limit = 700 * 1024
+        elif path == "/mis-tareas/perfil/foto":
+            limit = 6 * 1024 * 1024
         elif path in {"/documents", "/mis-tareas/clase/material"}:
             limit = 66 * 1024 * 1024
         elif path in {"/tutor/conversacion", "/mis-tareas/clase/transcribir"}:
@@ -84,7 +86,7 @@ class SecurityMiddleware:
                 message = {**message, "headers": headers}
             await send(message)
 
-        uploading = method == "POST" and path in {"/documents", "/mis-tareas/clase/material"}
+        uploading = method == "POST" and path in {"/documents", "/mis-tareas/clase/material", "/mis-tareas/perfil/foto"}
         if uploading and not self.upload_slot.acquire(blocking=False):
             await reject("Se está procesando otra subida. Espera un momento y vuelve a intentarlo.", 429)
             return

@@ -2,7 +2,7 @@
 
 Tutor educativo familiar que ayuda a comprender, practicar y razonar paso a paso. Adaptado a Infantil, Primaria, ESO y Bachillerato, con supervisión del adulto.
 
-**Versión actual: 1.5.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
+**Versión actual: 1.6.0.** Proyecto en evolución; las respuestas y el OCR deben revisarse cuando existan dudas.
 
 ## Cómo usar el aula
 
@@ -21,6 +21,8 @@ Modo de inglés por alumno, con nivel orientativo, conversación, lectura, escuc
 ![Modo Inglés con datos ficticios](docs/screenshots/ingles-alumno.png)
 
 [Pronunciación básica y escucha dinámica](docs/PRONUNCIACION_Y_ESCUCHA.md): activación del adulto, grabaciones de hasta 20 segundos y límites locales compartidos.
+
+[Foto de perfil con permiso del adulto](docs/FOTO_PERFIL.md): disponible desde Mi perfil, con cámara o archivos, imagen privada y posibilidad de eliminarla.
 
 ## Para el alumno
 
@@ -91,6 +93,7 @@ python tests/consumption_regression.py
 python tests/english_regression.py
 python tests/pronunciation_regression.py
 python tests/listening_regression.py
+python tests/profile_photo_regression.py
 node tests/conversation_controls.mjs
 ```
 

@@ -1,0 +1,22 @@
+{% extends "student_study.html" %}
+{% block page_styles %}{{ super() }}<script defer src="/static/profile-photo.js?v=1"></script>{% endblock %}
+{% block study_content %}
+<section class="card stack profile-settings">
+  <header class="profile-identity">{% with avatar_profile=profile, avatar_photo=photo %}{% include "photo_avatar.html" %}{% endwith %}<div><h1>Mi perfil</h1><p>{{ profile.name }} · {{ profile.course }}</p></div></header>
+  {% if photo.allowed %}
+  <p>El adulto permite que elijas tu foto. La veréis tú y el adulto dentro de Aula IA.</p>
+  <form method="post" action="/mis-tareas/perfil/foto" enctype="multipart/form-data" class="stack" data-profile-photo>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Elegir desde galería o archivos<input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" required data-photo-file></label>
+    <button type="button" class="button button-secondary" data-photo-camera-button hidden>Hacer una foto</button>
+    <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" capture="user" data-photo-camera hidden>
+    <img class="profile-photo-preview" width="240" height="240" alt="Vista previa de la foto elegida" data-photo-preview hidden>
+    <p role="status" data-photo-status hidden></p>
+    <p class="source-ref">JPG, PNG, WebP o HEIC, hasta 5 MB y 25 megapíxeles. Se recorta por el centro en formato cuadrado. Solo se guarda una copia pequeña, sin los metadatos de la foto original. No se envía a la IA.</p>
+    <button class="button button-primary">Guardar mi foto</button>
+  </form>
+  {% else %}<p class="privacy-note">Para poner tu foto, pide al adulto que active el permiso de foto en la configuración de tu perfil. Mientras tanto, se muestra tu inicial.</p>{% endif %}
+  {% if photo.has_photo %}<form method="post" action="/profiles/{{ profile.id }}/foto/eliminar"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-secondary">Quitar mi foto</button></form>{% endif %}
+  <a class="back-link" href="/mis-tareas">Volver a Inicio</a>
+</section>
+{% endblock %}

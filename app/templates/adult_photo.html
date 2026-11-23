@@ -1,0 +1,11 @@
+<section class="stack profile-photo-permission">
+  <h3>Foto de perfil</h3>
+  {% with avatar_profile=p, avatar_photo=profile_photos[p.id] %}{% include "photo_avatar.html" %}{% endwith %}
+  <form method="post" action="/profiles/{{ p.id }}/foto/permiso" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label class="usage-checkbox"><input type="checkbox" name="allowed" value="true"{% if profile_photos[p.id].allowed %} checked{% endif %}> Permitir que {{ p.name }} ponga su foto de perfil</label>
+    <p class="source-ref">El alumno la elige en Mi perfil. No es pública ni se envía a la IA. Al retirar el permiso y guardar, se elimina la foto actual.</p>
+    <button class="button button-secondary">Guardar permiso de foto</button>
+  </form>
+  {% if profile_photos[p.id].has_photo %}<form method="post" action="/profiles/{{ p.id }}/foto/eliminar"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-secondary">Eliminar foto del alumno</button></form>{% endif %}
+</section>

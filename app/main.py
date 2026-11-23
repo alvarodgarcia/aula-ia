@@ -23,7 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, rela
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
-from . import accounting, english, learning, listening, pronunciation, voice
+from . import accounting, english, learning, listening, profile_photo, pronunciation, voice
 from .security import SecurityMiddleware
 
 ROOT = Path(__file__).resolve().parent
@@ -98,6 +98,12 @@ class Profile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     documents: Mapped[list["StudyDocument"]] = relationship(back_populates="profile", cascade="all, delete-orphan")
     exercises: Mapped[list["Exercise"]] = relationship(back_populates="profile", cascade="all, delete-orphan")
+
+class ProfilePhoto(Base):
+    __tablename__ = "profile_photos"
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True)
+    allowed: Mapped[bool] = mapped_column(Boolean, default=False)
+    data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
 class StudentAccess(Base):
     __tablename__ = "student_access"
@@ -1846,6 +1852,7 @@ def student_tasks(request: Request, historial: str = "") -> Response:
         return render(request, "student_tasks.html", {
             "profile": profile,
             "age_group": student_age_group(profile.age),
+            "photo": photo_state(db, profile.id),
             "pending": pending, "completed": completed,
             "completed_tasks": sum(exercise.exercise_mode != "practice" for exercise in completed),
             "active_practice": active_practice(db, profile.id),
@@ -1865,6 +1872,106 @@ def student_tasks(request: Request, historial: str = "") -> Response:
 
 def student_packs(profile_id: int):
     return select(StudyPack).where(StudyPack.profile_id == profile_id, StudyPack.assigned.is_(True)).order_by(StudyPack.id.desc())
+
+def photo_state(db: Session, profile_id: int) -> dict:
+    row = db.execute(select(ProfilePhoto.allowed, ProfilePhoto.data.is_not(None)).where(ProfilePhoto.profile_id == profile_id)).first()
+    return {'allowed': bool(row and row[0]), 'has_photo': bool(row and row[0] and row[1])}
+
+
+@app.get('/mis-tareas/perfil')
+def student_photo_page(request: Request) -> Response:
+    with db_session() as db:
+        profile = student_profile(request, db)
+        if profile is None or authenticated(request):
+            return RedirectResponse('/login/alumno', status_code=303)
+        return student_view(request, 'student_profile.html', profile, photo=photo_state(db, profile.id))
+
+
+@app.get('/profiles/{profile_id}/foto')
+def profile_photo_image(profile_id: int, request: Request) -> Response:
+    with db_session() as db:
+        if not authenticated(request) and student_id(request, db) != profile_id:
+            raise HTTPException(status_code=404, detail='Foto no disponible.')
+        item = db.get(ProfilePhoto, profile_id)
+        if item is None or not item.allowed or not item.data:
+            raise HTTPException(status_code=404, detail='Foto no disponible.')
+        return Response(item.data, media_type='image/jpeg', headers={
+            'Cache-Control': 'private, no-store', 'Content-Disposition': 'inline; filename="perfil.jpg"'})
+
+
+@app.post('/profiles/{profile_id}/foto/permiso')
+def allow_profile_photo(profile_id: int, request: Request, csrf_token: str = Form(...), allowed: bool = Form(False)) -> Response:
+    redirect = login_redirect(request)
+    if redirect:
+        return redirect
+    check_csrf(request, csrf_token)
+    with db_session() as db:
+        profile = db.get(Profile, profile_id, with_for_update=True)
+        if profile is None:
+            raise HTTPException(status_code=404, detail='Perfil no encontrado.')
+        item = db.get(ProfilePhoto, profile_id, with_for_update=True)
+        if item is None:
+            item = ProfilePhoto(profile_id=profile_id)
+            db.add(item)
+        item.allowed = allowed
+        if not allowed:
+            item.data = None
+        audit_event(db, profile_id, 'Permiso de foto de perfil', '', 'permitido' if allowed else 'retirado y foto eliminada')
+        db.commit()
+    request.session['notice'] = 'Permiso de foto actualizado.'
+    return RedirectResponse(f'/?alumno={profile_id}#alumno-{profile_id}', status_code=303)
+
+
+@app.post('/mis-tareas/perfil/foto')
+async def upload_profile_photo(request: Request, csrf_token: str = Form(...), photo: UploadFile = File(...)) -> Response:
+    try:
+        with db_session() as db:
+            profile = student_profile(request, db)
+            if profile is None or authenticated(request):
+                raise HTTPException(status_code=403, detail='Entra como alumno.')
+            check_csrf(request, csrf_token)
+            profile_id = profile.id
+            if not photo_state(db, profile_id)['allowed']:
+                raise HTTPException(status_code=403, detail='El adulto debe permitir tu foto de perfil.')
+            if not reserve_security_limit(db, 'profile-photo', str(profile_id), 6, 3600):
+                raise HTTPException(status_code=429, detail='Has cambiado la foto varias veces. Espera un rato antes de probar otra.')
+        payload = await photo.read(profile_photo.MAX_BYTES + 1)
+        try:
+            sanitized = await run_in_threadpool(profile_photo.normalize, payload)
+        except ValueError as exc:
+            request.session['notice'] = str(exc)
+            return RedirectResponse('/mis-tareas/perfil', status_code=303)
+        with db_session() as db:
+            item = db.get(ProfilePhoto, profile_id, with_for_update=True)
+            # Recheck permission after decoding in case the adult revoked it meanwhile.
+            if item is None or not item.allowed:
+                raise HTTPException(status_code=403, detail='El adulto ha retirado el permiso de foto.')
+            item.data = sanitized
+            audit_event(db, profile_id, 'Foto de perfil', '', 'foto actualizada')
+            db.commit()
+        request.session['notice'] = 'Tu foto de perfil está guardada.'
+        return RedirectResponse('/mis-tareas/perfil', status_code=303)
+    finally:
+        await photo.close()
+
+
+@app.post('/profiles/{profile_id}/foto/eliminar')
+def remove_profile_photo(profile_id: int, request: Request, csrf_token: str = Form(...)) -> Response:
+    with db_session() as db:
+        adult = authenticated(request)
+        if not adult and student_id(request, db) != profile_id:
+            raise HTTPException(status_code=403, detail='No puedes cambiar este perfil.')
+        check_csrf(request, csrf_token)
+        if db.get(Profile, profile_id) is None:
+            raise HTTPException(status_code=404, detail='Perfil no encontrado.')
+        item = db.get(ProfilePhoto, profile_id, with_for_update=True)
+        if item:
+            item.data = None
+        audit_event(db, profile_id, 'Foto de perfil', '', 'foto eliminada por adulto' if adult else 'foto eliminada por alumno')
+        db.commit()
+    request.session['notice'] = 'Foto eliminada. Se mostrará tu inicial.'
+    return RedirectResponse(f'/?alumno={profile_id}#alumno-{profile_id}' if adult else '/mis-tareas/perfil', status_code=303)
+
 
 @app.get("/mis-tareas/repasos")
 def student_reviews(request: Request) -> Response:
@@ -2816,6 +2923,7 @@ def render_adult_dashboard(
     return render(request, "index.html", {
         "consumption_summary": accounting.report("mes"),
         "voice_ready": voice.synthesis_ready(),
+        "profile_photos": {p.id: photo_state(db, p.id) for p in profiles},
         "english_profiles": {p.id: english_config(db, p.id) for p in profiles},
         "pronunciation_family": pronunciation.overview(),
         "pronunciation_profiles": {p.id: pronunciation.overview(p.id) for p in profiles},

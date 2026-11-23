@@ -1,0 +1,1 @@
+{% if avatar_photo.has_photo %}<img class="profile-avatar" src="/profiles/{{ avatar_profile.id }}/foto" alt="Foto de perfil de {{ avatar_profile.name }}" width="80" height="80">{% else %}<span class="profile-avatar profile-avatar--initial" aria-hidden="true">{{ avatar_profile.name[:1]|upper }}</span>{% endif %}

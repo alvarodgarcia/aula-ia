@@ -1,4 +1,4 @@
-# Listening con tres niveles · Aula IA 1.5.0
+# Listening con tres niveles · Aula IA 1.6.0
 
 ## Decisión del adulto por alumno
 
@@ -42,7 +42,7 @@ La pregunta y el historial público se guardan separados del pasaje. Las correcc
 
 ## Instalar y verificar
 
-El parche acumulativo **Aula_IA_parche_v1.5.0.tar.gz** conserva `.env`, claves y región de Azure. Seguir los [pasos de instalación](PRONUNCIACION_Y_ESCUCHA.md#instalar-el-parche-acumulativo). Al arrancar se crean `listening_preferences` y `listening_exercises`, sin alterar columnas anteriores ni borrar datos.
+El parche acumulativo **Aula_IA_parche_v1.6.0.tar.gz** conserva `.env`, claves y región de Azure. Seguir los [pasos de instalación](PRONUNCIACION_Y_ESCUCHA.md#instalar-el-parche-acumulativo). Al arrancar se crean `listening_preferences` y `listening_exercises`, sin alterar columnas anteriores ni borrar datos.
 
 Después de instalar, probar con un perfil de prueba: ocultar texto, generar una práctica, verificar pregunta/audio/respuesta, repetir y consultar ayuda. Volver al adulto, permitir el texto y comprobar la misma actividad. Probar cada dificultad y la voz en los dispositivos de la familia.
 

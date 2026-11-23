@@ -1,4 +1,4 @@
-# Consumo y límites de IA · Aula IA 1.5.0
+# Consumo y límites de IA · Aula IA 1.6.0
 
 El adulto accede desde **Panel de adulto → Consumo y límites de IA** (`/consumo`). El alumno no tiene acceso a los datos de consumo de otros perfiles ni puede modificar presupuestos.
 
@@ -57,16 +57,16 @@ Referencias: [contadores y límites de tokens de OpenAI](https://developers.open
 
 ## Instalar
 
-El parche es acumulativo y conserva las credenciales y la región de Azure de `.env`. Subir `Aula_IA_parche_v1.5.0.tar.gz` a `/tmp` y ejecutar:
+El parche es acumulativo y conserva las credenciales y la región de Azure de `.env`. Subir `Aula_IA_parche_v1.6.0.tar.gz` a `/tmp` y ejecutar:
 
 ```sh
 cd /opt/proyecto-aula-ia &&
 bash scripts/backup.sh &&
-copia="backups/codigo-antes-v1.5.0-$(date +%Y%m%d-%H%M%S)" &&
+copia="backups/codigo-antes-v1.6.0-$(date +%Y%m%d-%H%M%S)" &&
 mkdir -p "$copia" &&
 cp -a app requirements.txt Dockerfile docker-compose.yml scripts "$copia/" &&
 if [ -f requirements.lock ]; then cp -a requirements.lock "$copia/"; fi &&
-tar -xzf /tmp/Aula_IA_parche_v1.5.0.tar.gz &&
+tar -xzf /tmp/Aula_IA_parche_v1.6.0.tar.gz &&
 docker compose build --pull web &&
 docker compose up -d --no-deps web &&
 docker compose ps web
